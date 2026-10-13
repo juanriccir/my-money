@@ -289,6 +289,42 @@ th { color: var(--gold); }
 .pv b { color: var(--gold-hi); font-family: var(--font-body); }
 .tip, .toast { background: #1b1914; color: var(--ink); border: 1px solid var(--gold-lo); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); }
 .toast button { color: var(--gold-hi); }
+
+/* ───── Ajustes, categorías e importador ───── */
+details.cfg > summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px; cursor: pointer; }
+details.cfg > summary::-webkit-details-marker { display: none; }
+details.cfg > summary::after { content: '▾'; color: var(--gold); margin-left: 4px; transition: transform .2s; }
+details.cfg[open] > summary::after { transform: rotate(180deg); }
+.cfg-t { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; flex: 1 1 auto; }
+.cfg-n { font-size: .78rem; color: var(--gold-hi); border: 1px solid var(--gold-lo); border-radius: 999px; padding: 1px 10px; }
+.cfg-list { list-style: none; margin: 4px 0 14px; padding: 0; display: grid; gap: 12px; }
+.cfg-row { border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 6px; min-width: 0; }
+.cfg-top { display: flex; align-items: center; gap: 8px; }
+.cfg-name, .cfg-kw, .cfg-add input, .imp-f select, .imp-f input { min-width: 0; border: 1px solid var(--line); background: #0e0e10; color: var(--ink); border-radius: 10px; padding: 0 12px; }
+.cfg-name { flex: 1 1 auto; height: 40px; font-weight: 500; }
+.cfg-kw { width: 100%; height: 36px; font-size: .82rem; color: var(--ink2); }
+.cfg-use { font-size: .76rem; color: var(--muted); white-space: nowrap; }
+.cfg-note { margin: 0; font-size: .8rem; color: var(--muted); }
+.cfg-add { display: flex; flex-wrap: wrap; gap: 8px; }
+.cfg-add input { height: 40px; flex: 1 1 140px; }
+.cfg-add input + input { flex: 2 1 180px; }
+.del.armed { width: auto; padding: 0 10px; color: var(--crit-text); font-size: .8rem; border: 1px solid var(--crit); }
+.imp-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 12px; margin-bottom: 4px; }
+.imp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; margin: 12px 0; }
+@media (max-width: 560px) { .imp-grid { grid-template-columns: minmax(0, 1fr); } }
+.imp-f { display: grid; gap: 4px; min-width: 0; font-size: .78rem; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; font-weight: 600; }
+.imp-f select, .imp-f input[type="number"] { width: 100%; height: 40px; font-size: .9rem; letter-spacing: 0; text-transform: none; font-weight: 400; }
+.imp-chk { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: var(--ink2); font-size: .9rem; }
+.imp-chk input { width: 18px; height: 18px; accent-color: var(--gold); }
+.imp-sum { margin: 14px 0 8px; color: var(--ink); line-height: 1.5; }
+.imp-sum b { color: var(--gold-hi); font-weight: 600; }
+.imp-warn { margin: 6px 0; color: var(--warn-text); font-size: .86rem; }
+.imp-foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+.rn { color: var(--muted); }
+table.mini { font-size: .8rem; }
+table.mini th, table.mini td { text-align: left; }
+table.mini td.mono { text-align: right; }
+table.mini th, table.mini td { padding: 5px 8px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
@@ -321,7 +357,7 @@ th { color: var(--gold); }
     <button class="tab" role="tab" data-tab="resumen" aria-selected="true">Resumen</button>
     <button class="tab" role="tab" data-tab="diario" aria-selected="false">Diario</button>
     <button class="tab" role="tab" data-tab="presupuestos" aria-selected="false">Presupuestos</button>
-    <button class="tab" role="tab" data-tab="datos" aria-selected="false">Datos</button>
+    <button class="tab" role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
   </nav>
 
   <main id="view"><p class="none">Cargando tus movimientos…</p></main>
@@ -378,44 +414,87 @@ function dayLabel(iso) {
 
 //#parser-start
 /* ───────────── categorías y lector de mensajes ───────────── */
-const mk = (name, kw) => ({ name, re: kw ? new RegExp('\\b(?:' + kw.split(' ').join('|') + ')\\b') : null });
-const OUT = [
-  mk('Mercado', 'mercado supermercado exito jumbo carulla olimpica d1 ara fruver frutas verduras plaza'),
-  mk('Restaurantes', 'almuerzo cena desayuno restaurante comida cafe cerveza cervezas pizza hamburguesa domicilio rappi helado postre snack empanada empanadas corrientazo panaderia pan'),
-  mk('Transporte', 'taxi uber didi cabify indriver bus mio metro gasolina parqueadero peaje moto pasaje transporte soat tecnomecanica'),
-  mk('Vivienda', 'arriendo alquiler administracion hipoteca predial reparacion muebles'),
-  mk('Servicios', 'luz agua gas internet celular plan claro movistar tigo wom epm emcali energia servicio acueducto recarga'),
-  mk('Salud', 'medico farmacia drogueria cita examen odontologo dentista eps medicina salud psicologo terapia'),
-  mk('Ocio', 'cine netflix spotify salida fiesta bar discoteca concierto juego juegos steam viaje hotel paseo vacaciones disney hbo prime youtube trago tragos'),
-  mk('Compras', 'ropa zapatos tenis amazon mercadolibre regalo compra electrodomestico zapatillas'),
-  mk('Educación', 'curso universidad matricula libro libros colegio clase platzi udemy pension'),
-  mk('Deudas', 'tarjeta credito cuota prestamo deuda'),
-  mk('Cuidado personal', 'peluqueria barberia corte gimnasio gym spa manicure'),
-  mk('Mascotas', 'perro gato veterinario mascota concentrado'),
-  mk('Ahorro', 'ahorro cdt inversion fondo'),
-  mk('Otros', '')
-];
-const INC = [
-  mk('Salario', 'sueldo salario nomina quincena prima cesantias mesada'),
-  mk('Freelance', 'freelance honorarios proyecto cliente comision'),
-  mk('Ventas', 'venta vendi'),
-  mk('Inversiones', 'dividendos intereses rendimientos'),
-  mk('Otros ingresos', '')
-];
-
-const MEDIOS = [
-  { name: 'Efectivo', rx: 'efectivo|cash' },
-  { name: 'Nequi', rx: 'nequi' },
-  { name: 'Daviplata', rx: 'daviplata' },
-  { name: 'Tarjeta débito', rx: 'tarjeta (?:de )?d[eé]bito|d[eé]bito|tdb' },
-  { name: 'Tarjeta crédito', rx: 'tarjeta (?:de )?cr[eé]dito|cr[eé]dito|tdc' },
-  { name: 'Tarjeta', rx: 'tarjeta' },
-  { name: 'Transferencia', rx: 'transferencia|transfer[ií]|pse|bancolombia|davivienda' }
-].map(m => ({
-  name: m.name,
-  re: new RegExp('(?:^|[^a-z0-9])(?:' + m.rx + ')(?![a-z0-9])', 'i'),
-  rm: new RegExp('(?:\\b(?:con|en|por|v[ií]a)\\s+)?(?:' + m.rx + ')(?![a-z0-9])', 'gi')
-}));
+const kwList = x => String(x || '').split(/[,\n]/).map(v => v.trim()).filter(Boolean);
+const D = (n, kw, o) => Object.assign({ n: n, k: (kw || '').split(' ').filter(Boolean).join(', ') }, o || {});
+const DEFAULT_CFG = {
+  out: [
+    D('Mercado', 'mercado supermercado exito jumbo carulla olimpica d1 ara fruver frutas verduras plaza'),
+    D('Restaurantes', 'almuerzo cena desayuno restaurante comida cafe cerveza cervezas pizza hamburguesa domicilio rappi helado postre snack empanada empanadas corrientazo panaderia pan'),
+    D('Transporte', 'taxi uber didi cabify indriver bus mio metro gasolina parqueadero peaje moto pasaje transporte soat tecnomecanica'),
+    D('Vivienda', 'arriendo alquiler administracion hipoteca predial reparacion muebles'),
+    D('Servicios', 'luz agua gas internet celular plan claro movistar tigo wom epm emcali energia servicio acueducto recarga'),
+    D('Salud', 'medico farmacia drogueria cita examen odontologo dentista eps medicina salud psicologo terapia'),
+    D('Ocio', 'cine netflix spotify salida fiesta bar discoteca concierto juego juegos steam viaje hotel paseo vacaciones disney hbo prime youtube trago tragos'),
+    D('Compras', 'ropa zapatos tenis amazon mercadolibre regalo compra electrodomestico zapatillas'),
+    D('Educación', 'curso universidad matricula libro libros colegio clase platzi udemy pension'),
+    D('Deudas', 'tarjeta credito cuota prestamo deuda'),
+    D('Cuidado personal', 'peluqueria barberia corte gimnasio gym spa manicure'),
+    D('Mascotas', 'perro gato veterinario mascota concentrado'),
+    D('Ahorro', 'ahorro cdt inversion fondo', { nb: 1 }),
+    D('Otros', '', { fb: 1 })
+  ],
+  in: [
+    D('Salario', 'sueldo salario nomina quincena prima cesantias mesada'),
+    D('Freelance', 'freelance honorarios proyecto cliente comision'),
+    D('Ventas', 'venta vendi'),
+    D('Inversiones', 'dividendos intereses rendimientos'),
+    D('Otros ingresos', '', { fb: 1 })
+  ],
+  med: [
+    { n: 'Efectivo', k: 'efectivo, cash' },
+    { n: 'Nequi', k: 'nequi' },
+    { n: 'Daviplata', k: 'daviplata' },
+    { n: 'Tarjeta débito', k: 'tarjeta debito, tarjeta de debito, debito, tdb' },
+    { n: 'Tarjeta crédito', k: 'tarjeta credito, tarjeta de credito, credito, tdc' },
+    { n: 'Tarjeta', k: 'tarjeta' },
+    { n: 'Transferencia', k: 'transferencia, transferi, pse, bancolombia, davivienda' }
+  ]
+};
+const cloneCfg = c => JSON.parse(JSON.stringify(c));
+const ESC_RX = x => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const VOW = { a: '[aáàäâ]', e: '[eéèëê]', i: '[iíìïî]', o: '[oóòöô]', u: '[uúùüû]', n: '[nñ]' };
+const accRx = x => ESC_RX(x).replace(/[aeioun]/g, c => VOW[c]).replace(/\s+/g, '\\s+');
+function compileItem(it) {
+  const kws = kwList(it.k).map(strip);
+  if (!it.fb) kws.push(strip(it.n));
+  const uniq = Array.from(new Set(kws.filter(k => k.length >= 2))).sort((a, b) => b.length - a.length);
+  return {
+    name: it.n, fb: !!it.fb, nb: !!it.nb, k: it.k || '',
+    kws: uniq.map(k => ({ len: k.length, re: new RegExp('(?:^|[^a-z0-9])' + ESC_RX(k).replace(/\s+/g, '\\s+') + '(?![a-z0-9])') })),
+    rm: uniq.length ? new RegExp('(?:\\b(?:con|en|por|v[ií]a)\\s+)?(?:' + uniq.map(accRx).join('|') + ')(?![a-z0-9])', 'gi') : null
+  };
+}
+let CFG = null, OUT = [], INC = [], MEDIOS = [];
+function applyCfg(cfg) {
+  CFG = cfg;
+  OUT = cfg.out.map(compileItem); INC = cfg.in.map(compileItem); MEDIOS = cfg.med.map(compileItem);
+}
+function normCfg(o) {
+  const base = cloneCfg(DEFAULT_CFG);
+  if (!o || typeof o !== 'object') return base;
+  const ok = a => Array.isArray(a) && a.length && a.every(x => x && typeof x.n === 'string' && x.n.trim());
+  ['out', 'in', 'med'].forEach(k => {
+    if (ok(o[k])) base[k] = o[k].map(x => { const r = { n: String(x.n).slice(0, 40), k: String(x.k || '') }; if (x.fb) r.fb = 1; if (x.nb) r.nb = 1; return r; });
+  });
+  [['out', 'Otros'], ['in', 'Otros ingresos']].forEach(q => { if (!base[q[0]].some(c => c.fb)) base[q[0]].push({ n: q[1], k: '', fb: 1 }); });
+  return base;
+}
+applyCfg(cloneCfg(DEFAULT_CFG));
+function bestMatch(list, low) {
+  let best = null, bl = 0;
+  for (const it of list) for (const k of it.kws) { if (k.len > bl && k.re.test(low)) { best = it; bl = k.len; break; } }
+  return best;
+}
+const fallbackOf = list => (list.find(c => c.fb) || list[list.length - 1]).name;
+const normKey = x => strip(String(x)).replace(/\s+/g, ' ').trim();
+const findByName = (list, name) => list.find(c => normKey(c.name) === normKey(name));
+function stripMed(text) { let t = text; MEDIOS.forEach(m => { if (m.rm) t = t.replace(m.rm, ' '); }); return t; }
+function detectMed(text) { const f = bestMatch(MEDIOS, strip(text)); return f ? f.name : null; }
+function detectCat(t, text) {
+  const low = strip(text), list = t === 'in' ? INC : OUT;
+  const f = bestMatch(list, bestMatch(MEDIOS, low) ? strip(stripMed(low)) : low);
+  return f ? f.name : fallbackOf(list);
+}
 
 function mkDate(y, m, d) {
   y = Number(y); m = Number(m); d = Number(d);
@@ -439,7 +518,7 @@ function toNumber(s, suf) {
   return v;
 }
 const INC_RE = /(^|\s)\+|\b(ingreso|ingrese|sueldo|salario|nomina|me pagaron|me pago|me consignaron|me consigno|recibi|venta|vendi|freelance|honorarios|bono|prima|cesantias|reembolso|devolucion|dividendos|rendimientos|mesada|quincena|comision)\b/;
-const OUT_RE = /(^|\s)-\s*\$?\d|\b(gaste|gasto|pague|compre|debito)\b/;
+const OUT_RE = /(^|\s)-\s*\$?\d|\b(gaste|gasto|pague|compre)\b/;
 
 function parseMsg(line, fallback) {
   const sp = splitPrefix(line);
@@ -468,25 +547,28 @@ function parseMsg(line, fallback) {
   const pick = pool.reduce((a, b) => (b.v > a.v ? b : a));
 
   const low = strip(t2);
-  let t = 'out';
-  if (OUT_RE.test(low)) t = 'out'; else if (INC_RE.test(low)) t = 'in';
   let med = null;
-  const mtag = low.match(/@([a-z]+)/);
+  const mtag = low.match(/@([a-z0-9]+)/);
   if (mtag) { const key = m => strip(m.name).replace(/\s/g, ''); const f = MEDIOS.find(m => key(m) === mtag[1]) || MEDIOS.find(m => key(m).startsWith(mtag[1])); if (f) med = f.name; }
-  if (!med) { const f = MEDIOS.find(m => m.re.test(low)); if (f) med = f.name; }
+  if (!med) { const f = bestMatch(MEDIOS, low); if (f) med = f.name; }
   const isPay = /\b(pago|pague|abono|abone|cuota)\b/.test(low);
-  let lowC = low;
-  if (med && !isPay) MEDIOS.forEach(m => { lowC = lowC.replace(m.rm, ' '); });
+  const lowC = med && !isPay ? strip(stripMed(low)) : low;
+  const tag = low.match(/#([a-z0-9]+)/);
+  const tagF = list => { if (!tag) return null; const key = c => strip(c.name).replace(/\s/g, ''); return list.find(c => key(c) === tag[1]) || list.find(c => key(c).startsWith(tag[1])); };
+  let t = 'out';
+  if (OUT_RE.test(low)) t = 'out';
+  else if (INC_RE.test(low)) t = 'in';
+  else if (tag) { if (tagF(INC) && !tagF(OUT)) t = 'in'; }
+  else { if (bestMatch(INC, lowC) && !bestMatch(OUT, lowC)) t = 'in'; }
   const list = t === 'in' ? INC : OUT;
   let cat = null;
-  const tag = low.match(/#([a-z0-9]+)/);
-  if (tag) { const f = list.find(c => strip(c.name).replace(/\s/g, '').startsWith(tag[1])); if (f) cat = f.name; }
-  if (!cat) { for (const c of list) { if (c.re && c.re.test(lowC)) { cat = c.name; break; } } }
-  if (!cat) cat = t === 'in' ? 'Otros ingresos' : 'Otros';
+  const tf = tagF(list); if (tf) cat = tf.name;
+  if (!cat) { const f = bestMatch(list, lowC); if (f) cat = f.name; }
+  if (!cat) cat = fallbackOf(list);
 
   let n = t2.slice(0, pick.idx) + ' ' + t2.slice(pick.idx + pick.text.length);
   n = n.replace(/[#@]\p{L}+/gu, ' ');
-  if (med && !isPay) MEDIOS.forEach(m => { n = n.replace(m.rm, ' '); });
+  if (med && !isPay) n = stripMed(n);
   n = n.replace(/[$+]/g, ' ').replace(/^\s*-\s*/, '').replace(/(^|\s)-(?=\s|$)/g, ' ');
   n = n.replace(/^\s*(gaste|gasto|pague|compre|ingreso|ingrese|recibi|recibí)\s+/i, '');
   n = n.replace(/^\s*(en|de|del|por|para|la|el|un|una|mi)\s+/i, '');
@@ -512,17 +594,20 @@ function parseBulk(text) {
 
 /* ───────────── almacenamiento (solo en este dispositivo) ───────────── */
 const Store = (function () {
-  let months = {}, budgets = {}, ready = false;
+  let months = {}, budgets = {}, ready = false, seq = 0;
   const listeners = [];
   const LS = 'mymoney.v1';
   const emit = () => listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } });
-  const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const newId = () => Date.now().toString(36) + (seq++).toString(36) + Math.random().toString(36).slice(2, 5);
   function save() {
-    try { localStorage.setItem(LS, JSON.stringify({ v: 1, months: months, budgets: budgets })); }
-    catch (e) { toast('No pude guardar en este dispositivo. Descarga un respaldo desde la pestaña Datos.'); }
+    try { localStorage.setItem(LS, JSON.stringify({ v: 2, months: months, budgets: budgets, cfg: CFG })); }
+    catch (e) { toast('No pude guardar en este dispositivo. Descarga un respaldo desde la pestaña Ajustes.'); }
   }
   function init() {
-    try { const o = JSON.parse(localStorage.getItem(LS) || '{}'); months = o.months || {}; budgets = o.budgets || {}; } catch (e) { months = {}; budgets = {}; }
+    let o = {};
+    try { o = JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch (e) { o = {}; }
+    months = o.months || {}; budgets = o.budgets || {};
+    applyCfg(normCfg(o.cfg));
     ready = true; emit();
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   }
@@ -554,9 +639,82 @@ const Store = (function () {
     if (!silent) emit(); save();
   }
   function setBudgets(obj) { budgets = Object.assign({}, obj); emit(); save(); }
-  function dump() { return { v: 1, exportado: new Date().toISOString(), months: months, budgets: budgets }; }
+
+  /* categorías, fuentes de ingreso y medios de pago */
+  const cleanName = x => { const t = String(x || '').replace(/\s+/g, ' ').trim().slice(0, 40); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const txField = kind => (kind === 'med' ? 'm' : 'c');
+  const hits = (x, kind, name) => (kind === 'med' ? x.m === name : x.t === kind && x.c === name);
+  function cfgCommit(silent) { applyCfg(CFG); save(); if (!silent) emit(); }
+  function cfgAdd(kind, name, kw) {
+    name = cleanName(name);
+    if (!name) return { err: 'Escribe un nombre.' };
+    if (CFG[kind].some(c => normKey(c.n) === normKey(name))) return { err: 'Ya existe "' + name + '".' };
+    const item = { n: name, k: kwList(kw).join(', ') };
+    const fi = CFG[kind].findIndex(c => c.fb);
+    if (fi >= 0) CFG[kind].splice(fi, 0, item); else CFG[kind].push(item);
+    cfgCommit(); return { ok: name };
+  }
+  function ensure(kind, name) {
+    name = cleanName(name);
+    const ex = CFG[kind].find(c => normKey(c.n) === normKey(name));
+    if (ex) return ex.n;
+    const item = { n: name, k: '' };
+    const fi = CFG[kind].findIndex(c => c.fb);
+    if (fi >= 0) CFG[kind].splice(fi, 0, item); else CFG[kind].push(item);
+    applyCfg(CFG); return name;
+  }
+  function cfgRename(kind, old, nn) {
+    nn = cleanName(nn);
+    if (!nn) return { err: 'El nombre no puede quedar vacío.' };
+    const it = CFG[kind].find(c => c.n === old);
+    if (!it) return { err: 'No encontré esa opción.' };
+    if (CFG[kind].some(c => c !== it && normKey(c.n) === normKey(nn))) return { err: 'Ya existe "' + nn + '".' };
+    it.n = nn;
+    const f = txField(kind);
+    Object.keys(months).forEach(k => { months[k] = months[k].map(x => (hits(x, kind, old) ? Object.assign({}, x, { [f]: nn }) : x)); });
+    if (kind === 'out' && budgets[old] != null) { budgets = Object.assign({}, budgets); budgets[nn] = budgets[old]; delete budgets[old]; }
+    cfgCommit(true); return { ok: nn };
+  }
+  function cfgKw(kind, name, kw) {
+    const it = CFG[kind].find(c => c.n === name); if (!it) return;
+    it.k = kwList(kw).join(', '); cfgCommit(true);
+  }
+  function cfgDelete(kind, name) {
+    const it = CFG[kind].find(c => c.n === name);
+    if (!it || it.fb) return { err: 'Esta opción no se puede borrar.' };
+    const fb = kind === 'med' ? null : CFG[kind].find(c => c.fb).n;
+    let moved = 0;
+    Object.keys(months).forEach(k => {
+      months[k] = months[k].map(x => {
+        if (!hits(x, kind, name)) return x;
+        moved++;
+        const y = Object.assign({}, x);
+        if (kind === 'med') delete y.m; else y.c = fb;
+        return y;
+      });
+    });
+    if (kind === 'out' && budgets[name] != null) { budgets = Object.assign({}, budgets); delete budgets[name]; }
+    CFG[kind] = CFG[kind].filter(c => c !== it);
+    cfgCommit(); return { ok: true, moved: moved, to: fb };
+  }
+  function usage(kind) {
+    const u = {};
+    Object.keys(months).forEach(k => months[k].forEach(x => {
+      if (kind === 'med') { if (x.m) u[x.m] = (u[x.m] || 0) + 1; } else if (x.t === kind) u[x.c] = (u[x.c] || 0) + 1;
+    }));
+    return u;
+  }
+
+  function dump() { return { v: 2, exportado: new Date().toISOString(), months: months, budgets: budgets, cfg: CFG }; }
   function restore(o) {
     if (!o || typeof o.months !== 'object' || !o.months) throw new Error('formato');
+    if (o.cfg) {
+      const inc = normCfg(o.cfg);
+      ['out', 'in', 'med'].forEach(k => inc[k].forEach(c => {
+        if (!CFG[k].some(x => normKey(x.n) === normKey(c.n))) { const fi = CFG[k].findIndex(x => x.fb); const item = { n: c.n, k: c.k || '' }; if (fi >= 0) CFG[k].splice(fi, 0, item); else CFG[k].push(item); }
+      }));
+      applyCfg(CFG);
+    }
     const have = new Set(Object.keys(months).reduce((a, k) => a.concat(months[k].map(x => x.id)), []));
     let added = 0;
     Object.keys(o.months).forEach(k => {
@@ -568,9 +726,10 @@ const Store = (function () {
     if (o.budgets && typeof o.budgets === 'object') budgets = Object.assign({}, budgets, o.budgets);
     emit(); save(); return added;
   }
-  function clearAll() { months = {}; budgets = {}; emit(); save(); }
+  function clearAll() { months = {}; budgets = {}; applyCfg(cloneCfg(DEFAULT_CFG)); emit(); save(); }
   return {
     init: init, addMany: addMany, remove: remove, patch: patch, setBudget: setBudget, setBudgets: setBudgets,
+    cfgAdd: cfgAdd, cfgRename: cfgRename, cfgKw: cfgKw, cfgDelete: cfgDelete, ensure: ensure, cfgCommit: cfgCommit, usage: usage, newId: newId,
     dump: dump, restore: restore, clearAll: clearAll,
     sub: f => listeners.push(f),
     ready: () => ready,
@@ -581,7 +740,7 @@ const Store = (function () {
 })();
 
 /* ───────────── estado y cálculos ───────────── */
-const S = { month: todayISO().slice(0, 7), tab: 'resumen', q: '', type: 'all', med: 'all', medio: null };
+const S = { month: todayISO().slice(0, 7), tab: 'resumen', q: '', type: 'all', med: 'all', medio: null, open: [], imp: null };
 const txOf = k => Store.month(k).slice().sort((a, b) => b.d.localeCompare(a.d) || String(b.id).localeCompare(String(a.id)));
 const sum = (arr, t) => arr.reduce((s, x) => s + (x.t === t ? x.a : 0), 0);
 function catTotals(items) {
@@ -792,14 +951,17 @@ function viewResumen() {
 
 function rowHTML(x) {
   const list = x.t === 'in' ? INC : OUT;
-  const opts = list.map(c => '<option' + (c.name === x.c ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
-  return '<li class="row"><div class="bubble"><span class="raw">' + esc(x.r || x.n) + '</span><span class="meta"><span class="chip ' + x.t + '">' + (x.t === 'in' ? 'Ingreso' : 'Gasto') + '</span><select class="catsel" data-id="' + esc(x.id) + '" aria-label="Categoría de ' + esc(x.n) + '">' + opts + '</select><select class="medsel" data-id="' + esc(x.id) + '" aria-label="Medio de pago de ' + esc(x.n) + '"><option value="">Sin medio</option>' + MEDIOS.map(m => '<option' + (m.name === x.m ? ' selected' : '') + '>' + m.name + '</option>').join('') + '</select>' + (x.n && x.n !== x.c ? '<span>' + esc(x.n) + '</span>' : '') + '</span></div>' +
+  let opts = list.map(c => '<option' + (c.name === x.c ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('');
+  if (!list.some(c => c.name === x.c)) opts = '<option selected>' + esc(x.c) + '</option>' + opts;
+  let mopts = MEDIOS.map(m => '<option' + (m.name === x.m ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('');
+  if (x.m && !MEDIOS.some(m => m.name === x.m)) mopts += '<option selected>' + esc(x.m) + '</option>';
+  return '<li class="row"><div class="bubble"><span class="raw">' + esc(x.r || x.n) + '</span><span class="meta"><span class="chip ' + x.t + '">' + (x.t === 'in' ? 'Ingreso' : 'Gasto') + '</span><select class="catsel" data-id="' + esc(x.id) + '" aria-label="Categoría de ' + esc(x.n) + '">' + opts + '</select><select class="medsel" data-id="' + esc(x.id) + '" aria-label="Medio de pago de ' + esc(x.n) + '"><option value="">Sin medio</option>' + mopts + '</select>' + (x.n && x.n !== x.c ? '<span>' + esc(x.n) + '</span>' : '') + '</span></div>' +
     '<span class="amt mono ' + x.t + '">' + (x.t === 'in' ? '+' : '−') + money(x.a) + '</span><button class="del" data-del="' + esc(x.id) + '" aria-label="Eliminar ' + esc(x.n) + '">✕</button></li>';
 }
 function viewDiario() {
   if (!Store.all().length) return emptyHTML();
   return bannerHTML() + '<div class="filters"><input class="search" id="q" type="search" placeholder="Buscar en ' + monthWord(S.month) + '…" value="' + esc(S.q) + '" aria-label="Buscar">' +
-    '<select class="search" id="fm" style="flex:0 1 190px" aria-label="Medio de pago"><option value="all">Todos los medios</option>' + MEDIOS.map(m => '<option value="' + m.name + '"' + (S.med === m.name ? ' selected' : '') + '>' + m.name + '</option>').join('') + '<option value="none"' + (S.med === 'none' ? ' selected' : '') + '>Sin medio</option></select>' +
+    '<select class="search" id="fm" style="flex:0 1 190px" aria-label="Medio de pago"><option value="all">Todos los medios</option>' + MEDIOS.map(m => '<option value="' + esc(m.name) + '"' + (S.med === m.name ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('') + '<option value="none"' + (S.med === 'none' ? ' selected' : '') + '>Sin medio</option></select>' +
     '<div class="seg" role="group" aria-label="Tipo">' + [['all', 'Todos'], ['out', 'Gastos'], ['in', 'Ingresos']].map(t => '<button type="button" data-type="' + t[0] + '" aria-pressed="' + (S.type === t[0]) + '">' + t[1] + '</button>').join('') + '</div></div><div id="dl"></div>';
 }
 function paintDiary() {
@@ -825,7 +987,7 @@ function viewPresu() {
   if (!Store.all().length) return emptyHTML();
   const items = txOf(S.month), spent = catTotals(items), B = Store.budgets();
   const tb = OUT.reduce((s, c) => s + (B[c.name] || 0), 0), ts = sum(items, 'out');
-  const rows = OUT.filter(c => c.name !== 'Ahorro').map((c, i) => {
+  const rows = OUT.filter(c => !c.nb).map((c, i) => {
     const s = spent[c.name] || 0, st = budgetStat(s, B[c.name]);
     return '<li class="brow" data-cat="' + esc(c.name) + '" data-spent="' + s + '"><div class="bhead"><label for="b' + i + '">' + esc(c.name) + '</label><span class="vals mono">' + money(s) + ' <span>de</span> <input class="binput" id="b' + i + '" data-cat="' + esc(c.name) + '" type="text" inputmode="numeric" placeholder="Sin tope" value="' + (B[c.name] ? nf.format(B[c.name]) : '') + '" aria-label="Tope mensual de ' + esc(c.name) + '"></span></div>' +
       '<div class="track"><i class="fill ' + st.st + '" style="width:' + st.pct.toFixed(1) + '%"></i></div><p class="bstat ' + st.st + '">' + st.label + '</p></li>';
@@ -845,16 +1007,444 @@ function paintBudgetRow(li) {
 }
 
 /* ───────────── render ───────────── */
-function viewDatos() {
+/* ───────────── Ajustes: categorías, fuentes y medios ───────────── */
+function cfgCard(kind, title, sub, ph) {
+  const list = kind === 'med' ? MEDIOS : kind === 'in' ? INC : OUT;
+  const use = Store.usage(kind);
+  const rows = list.map(c => {
+    const n = use[c.name] || 0;
+    return '<li class="cfg-row" data-k="' + kind + '" data-n="' + esc(c.name) + '">' +
+      '<div class="cfg-top"><input class="cfg-name" type="text" maxlength="40" value="' + esc(c.name) + '" aria-label="Nombre">' +
+      '<span class="cfg-use">' + n + (n === 1 ? ' mov.' : ' movs.') + '</span>' +
+      (c.fb ? '' : '<button type="button" class="del" data-cdel aria-label="Borrar ' + esc(c.name) + '">✕</button>') + '</div>' +
+      (c.fb ? '<p class="cfg-note">Se usa cuando no reconozco ninguna palabra.</p>' : '<input class="cfg-kw" type="text" value="' + esc(c.k) + '" placeholder="Palabras que la detectan, separadas por coma" aria-label="Palabras clave de ' + esc(c.name) + '">') + '</li>';
+  }).join('');
+  return '<details class="card cfg" data-k="' + kind + '"' + (S.open.indexOf(kind) >= 0 ? ' open' : '') + '><summary><span class="cfg-t">' + title + '</span><span class="cfg-n">' + list.length + '</span></summary>' +
+    '<p class="set-p">' + sub + '</p><ul class="cfg-list">' + rows + '</ul>' +
+    '<form class="cfg-add" data-k="' + kind + '"><input id="add-' + kind + '" type="text" maxlength="40" placeholder="' + esc(ph) + '" aria-label="Nombre nuevo"><input id="addkw-' + kind + '" type="text" placeholder="Palabras clave (opcional)" aria-label="Palabras clave nuevas"><button class="btn primary" type="submit">Agregar</button></form></details>';
+}
+function viewAjustes() {
   const n = Store.all().length;
   const standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone;
+  const kwHelp = ' Las palabras clave hacen que el chat y la importación la reconozcan solos, por ejemplo "arriendo, alquiler". El nombre también cuenta como palabra clave.';
   return '<div class="grid">' +
+    '<section class="card span2"><h2>Importar historial</h2><p class="set-p">Sube tu Excel (.xlsx), un CSV o un PDF de extracto. Antes de guardar te muestro qué entendí, y puedes deshacer la importación.</p>' +
+    '<div class="set-actions"><label class="btn primary" for="impFile">Elegir archivo</label><input id="impFile" type="file" accept=".xlsx,.xlsm,.csv,.tsv,.txt,.pdf,application/pdf" hidden><button class="btn" data-act="import">Pegar mensajes de WhatsApp</button></div></section>' +
+    cfgCard('out', 'Categorías de gastos', 'Cambia el nombre, borra las que no uses o crea las tuyas.' + kwHelp, 'Ej. Suscripciones') +
+    cfgCard('in', 'Fuentes de ingreso', 'Crea una por cada persona o empresa que te da plata, por ejemplo Papá.' + kwHelp, 'Ej. Papá') +
+    cfgCard('med', 'Medios de pago', 'Cuenta de ahorros, Nequi, efectivo, la que uses. Si borras uno, sus movimientos quedan sin medio.' + kwHelp, 'Ej. Cuenta de ahorros') +
     '<section class="card"><h2>Tus datos</h2><p class="set-p">Todo se guarda solo en este dispositivo y no se envía a internet. Ahora tienes <b>' + n + '</b> movimientos. Descarga un respaldo de vez en cuando por si cambias de celular o borras los datos del navegador.</p>' +
-    '<div class="set-actions"><button class="btn primary" data-act="csv">Descargar para Excel</button><button class="btn" data-act="backup">Descargar respaldo</button><label class="btn" for="restore">Restaurar respaldo</label><input id="restore" type="file" accept=".json,application/json" hidden><button class="btn" data-act="import">Importar mensajes</button><button class="btn danger" data-act="wipe">Borrar todo</button></div></section>' +
+    '<div class="set-actions"><button class="btn primary" data-act="csv">Descargar para Excel</button><button class="btn" data-act="backup">Descargar respaldo</button><label class="btn" for="restore">Restaurar respaldo</label><input id="restore" type="file" accept=".json,application/json" hidden><button class="btn danger" data-act="wipe">Borrar todo</button></div></section>' +
     '<section class="card"><h2>Instalar en el celular</h2>' + (standalone ? '<p class="okline" style="margin:8px 0 0">✓ Ya estás usando la app instalada.</p>' :
       '<ol class="howto"><li><b>Android (Chrome):</b> menú ⋮ y luego Instalar app.</li><li><b>iPhone (Safari):</b> botón Compartir y luego Añadir a pantalla de inicio.</li></ol>' + (deferredPrompt ? '<div class="set-actions" style="margin-top:12px"><button class="btn primary" data-act="install">Instalar app</button></div>' : '')) + '</section>' +
-    '<section class="card span2"><h2>Cómo anotar en el chat</h2><ol class="howto"><li><code>almuerzo 25k nequi</code> es un gasto de $ 25.000 en Restaurantes, pagado con Nequi.</li><li><code>+sueldo 3.8M transferencia</code> es un ingreso. El signo + o palabras como sueldo, freelance o me pagaron lo marcan como ingreso.</li><li><code>ayer taxi 12000 efectivo</code> usa la fecha de ayer. También sirven hoy, anteayer o 5/10.</li><li>Montos: <code>25k</code>, <code>25 mil</code>, <code>1.5M</code>, <code>1,5 millones</code>, <code>25.000</code>. Si no escribes el medio, toca uno de los botones sobre la barra de escribir.</li><li>Para forzar categoría o medio: <code>cena 80k #ocio @tarjeta</code>.</li></ol></section></div>';
+    '<section class="card span2"><h2>Cómo anotar en el chat</h2><ol class="howto"><li><code>almuerzo 25k nequi</code> es un gasto de $ 25.000 en Restaurantes, pagado con Nequi.</li><li><code>+sueldo 3.8M transferencia</code> es un ingreso. El signo + o palabras como sueldo, freelance o me pagaron lo marcan como ingreso.</li><li><code>ayer taxi 12000 efectivo</code> usa la fecha de ayer. También sirven hoy, anteayer o 5/10.</li><li>Montos: <code>25k</code>, <code>25 mil</code>, <code>1.5M</code>, <code>1,5 millones</code>, <code>25.000</code>. Si no escribes el medio, toca uno de los botones sobre la barra de escribir.</li><li>Para forzar categoría o medio: <code>cena 80k #ocio @tarjeta</code>. Funciona también con las que crees en Ajustes.</li></ol></section></div>';
 }
+
+/* ───────────── importar archivos (Excel, CSV, PDF) ───────────── */
+function loadScript(src) { return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('No pude cargar un componente de la app. Revisa tu conexión e intenta de nuevo.')); document.head.appendChild(el); }); }
+const colName = i => { let t = '', n = i + 1; while (n > 0) { const r = (n - 1) % 26; t = String.fromCharCode(65 + r) + t; n = Math.floor((n - 1) / 26); } return t; };
+const capName = x => { const t = String(x).replace(/\s+/g, ' ').trim().slice(0, 40); return t.charAt(0).toUpperCase() + t.slice(1); };
+const MES_ES = { ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12, jan: 1, apr: 4, aug: 8, dec: 12 };
+
+function realDate(y, m, d) {
+  y = Number(y); m = Number(m); d = Number(d);
+  if (y < 100) y += 2000;
+  if (y < 1990 || y > 2100 || m < 1 || m > 12 || d < 1) return null;
+  const dt = new Date(y, m - 1, d);
+  if (dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return y + '-' + pad(m) + '-' + pad(d);
+}
+function parseDateCell(v, order) {
+  if (v == null || v === '' || typeof v === 'number') return null;
+  const t = String(v).trim(); if (!t) return null;
+  let m;
+  if ((m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?!\d)/))) return realDate(m[1], m[2], m[3]);
+  if ((m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?!\d)/))) {
+    let d = order === 'mdy' ? Number(m[2]) : Number(m[1]), mo = order === 'mdy' ? Number(m[1]) : Number(m[2]);
+    if (mo > 12 && d <= 12) { const x = d; d = mo; mo = x; }
+    return realDate(m[3], mo, d);
+  }
+  if ((m = strip(t).match(/^(\d{1,2})\s*(?:de\s+)?([a-z]{3,})\.?,?\s*(?:de\s+)?(\d{2,4})/))) { const mo = MES_ES[m[2].slice(0, 3)]; if (mo) return realDate(m[3], mo, m[1]); }
+  return null;
+}
+function parseMoney(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : NaN;
+  let t = String(v == null ? '' : v).trim(); if (!t) return NaN;
+  const neg = /^\(.*\)$/.test(t) || /^[^\dA-Za-z]*-[^\dA-Za-z]*\d/.test(t) || /\d\s*-$/.test(t);
+  t = t.replace(/[^\d.,]/g, '');
+  if (!/\d/.test(t)) return NaN;
+  const ld = t.lastIndexOf('.'), lc = t.lastIndexOf(',');
+  let n;
+  if (ld >= 0 && lc >= 0) { const dec = Math.max(ld, lc); n = Number(t.slice(0, dec).replace(/[.,]/g, '') + '.' + t.slice(dec + 1)); }
+  else if (ld >= 0 || lc >= 0) {
+    const parts = t.split(ld >= 0 ? '.' : ',');
+    if (parts.length > 2 || (parts[1].length === 3 && parts[0] !== '0' && parts[0] !== '')) n = Number(parts.join(''));
+    else n = Number(parts[0] + '.' + parts[1]);
+  } else n = Number(t);
+  return neg ? -n : n;
+}
+const tipoOf = x => { const l = strip(x); if (!l) return null; if (/ingres|entrad|abono|credit|deposit|recib|income|\+/.test(l)) return 'in'; if (/egres|gast|salid|debit|retiro|pago|compra|expense|cargo|-/.test(l)) return 'out'; return null; };
+function textIsIncome(desc, cat) {
+  const low = strip(desc + ' ' + cat);
+  return INC_RE.test(low) || /\b(abono|consignacion|deposito|recibid[oa]|reembolso|devolucion|rendimientos|intereses ganados|pago de nomina)\b/.test(low) || (!!bestMatch(INC, low) && !bestMatch(OUT, low));
+}
+
+/* lectura de archivos */
+function decodeText(u8) {
+  let t = new TextDecoder('utf-8').decode(u8);
+  if (t.indexOf('�') >= 0) t = new TextDecoder('windows-1252').decode(u8);
+  return t.replace(/^﻿/, '');
+}
+function readCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim()).slice(0, 8);
+  const cnt = d => lines.reduce((a, l) => a + (l.split(d).length - 1), 0);
+  const delim = [';', ',', '\t', '|'].map(d => [d, cnt(d)]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"' && cell === '') q = true;
+    else if (c === delim) { row.push(cell); cell = ''; }
+    else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(cell); cell = ''; rows.push(row); row = []; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  while (rows.length && rows[rows.length - 1].every(c => !String(c).trim())) rows.pop();
+  return rows.map(r => r.map(c => String(c).trim()));
+}
+function serialToISO(v) {
+  const d = new Date(Date.UTC(1899, 11, 30) + Math.floor(v) * 864e5);
+  return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
+}
+function isDateFmt(id, fmts) {
+  if ((id >= 14 && id <= 22) || (id >= 27 && id <= 36) || (id >= 45 && id <= 47) || (id >= 50 && id <= 58)) return true;
+  const c = fmts[id]; if (!c) return false;
+  return /[dmy]/i.test(c.replace(/"[^"]*"/g, '').replace(/\[[^\]]*\]/g, '').replace(/\\./g, ''));
+}
+async function readXlsx(buf) {
+  if (!window.JSZip) await loadScript('jszip.min.js');
+  let zip;
+  try { zip = await JSZip.loadAsync(buf); } catch (e) { throw new Error('No pude abrir ese archivo. ¿Está dañado?'); }
+  const get = async path => { const f = zip.file(path); return f ? f.async('string') : null; };
+  const xml = x => new DOMParser().parseFromString(x, 'application/xml');
+  const wbS = await get('xl/workbook.xml');
+  if (!wbS) throw new Error('Ese archivo no es un Excel (.xlsx) que pueda leer. Si es de Google Sheets, descárgalo como Microsoft Excel (.xlsx).');
+  const rels = {}, relS = await get('xl/_rels/workbook.xml.rels');
+  if (relS) Array.from(xml(relS).getElementsByTagName('Relationship')).forEach(r => { rels[r.getAttribute('Id')] = r.getAttribute('Target'); });
+  const ss = [], ssS = await get('xl/sharedStrings.xml');
+  if (ssS) Array.from(xml(ssS).getElementsByTagName('si')).forEach(si => { ss.push(Array.from(si.getElementsByTagName('t')).map(t => t.textContent).join('')); });
+  const dateXf = [], stS = await get('xl/styles.xml');
+  if (stS) {
+    const st = xml(stS), fmts = {};
+    Array.from(st.getElementsByTagName('numFmt')).forEach(n => { fmts[n.getAttribute('numFmtId')] = n.getAttribute('formatCode') || ''; });
+    const xfs = st.getElementsByTagName('cellXfs')[0];
+    if (xfs) Array.from(xfs.getElementsByTagName('xf')).forEach((x, k) => { dateXf[k] = isDateFmt(Number(x.getAttribute('numFmtId')), fmts); });
+  }
+  const colIdx = ref => { let n = 0; ref.replace(/[^A-Za-z]/g, '').toUpperCase().split('').forEach(ch => { n = n * 26 + ch.charCodeAt(0) - 64; }); return n - 1; };
+  const sheets = [];
+  const shEls = Array.from(xml(wbS).getElementsByTagName('sheet'));
+  for (let si = 0; si < shEls.length; si++) {
+    const el = shEls[si];
+    const rid = el.getAttribute('r:id') || el.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    let target = rels[rid] || ('worksheets/sheet' + (si + 1) + '.xml');
+    target = target.charAt(0) === '/' ? target.slice(1) : 'xl/' + target.replace(/^\.\//, '');
+    const sx = await get(target); if (!sx) continue;
+    const rows = []; let auto = 0;
+    Array.from(xml(sx).getElementsByTagName('row')).forEach(r => {
+      const ri = r.getAttribute('r') ? Number(r.getAttribute('r')) - 1 : auto; auto = ri + 1;
+      const arr = rows[ri] || (rows[ri] = []);
+      Array.from(r.getElementsByTagName('c')).forEach(c => {
+        const ci = colIdx(c.getAttribute('r') || ''), t = c.getAttribute('t'), sIdx = Number(c.getAttribute('s') || 0);
+        const vEl = c.getElementsByTagName('v')[0];
+        let val = '';
+        if (t === 'inlineStr') val = Array.from(c.getElementsByTagName('t')).map(x => x.textContent).join('');
+        else if (vEl) {
+          const raw = vEl.textContent;
+          if (t === 's') val = ss[Number(raw)] != null ? ss[Number(raw)] : '';
+          else if (t === 'str' || t === 'e') val = raw;
+          else if (t === 'b') val = raw === '1' ? 'VERDADERO' : 'FALSO';
+          else { const num = Number(raw); val = isNaN(num) ? raw : num; if (typeof val === 'number' && dateXf[sIdx] && val > 0) val = serialToISO(val); }
+        }
+        arr[ci] = val;
+      });
+    });
+    let w = 0; for (let k = 0; k < rows.length; k++) if (rows[k]) w = Math.max(w, rows[k].length);
+    const full = [];
+    for (let k = 0; k < rows.length; k++) { const a = rows[k] || []; const b = []; for (let c = 0; c < w; c++) b.push(a[c] == null ? '' : a[c]); full.push(b); }
+    while (full.length && full[full.length - 1].every(c => c === '')) full.pop();
+    if (full.length) sheets.push({ name: el.getAttribute('name') || ('Hoja ' + (si + 1)), rows: full });
+  }
+  if (!sheets.length) throw new Error('No encontré datos en ese Excel.');
+  return sheets;
+}
+
+const PDF_DATES = [
+  /(?<!\d)(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?!\d)/,
+  /(?<![\d.,\/])(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?!\d)/,
+  /(?<!\d)(\d{1,2})\s*(?:de\s+)?(ene|feb|mar|abr|may|jun|jul|ago|sep|sept|set|oct|nov|dic)[a-z]*\.?(?:\s*(?:de\s+)?(\d{4}))?(?![a-z])/i
+];
+function pdfLineToRow(text) {
+  let best = null;
+  PDF_DATES.forEach((re, k) => { const m = re.exec(text); if (m && m.index <= 14 && (!best || m.index < best.m.index)) best = { m: m, k: k }; });
+  if (!best) return null;
+  const m = best.m; let dateStr = m[0].trim();
+  if (best.k === 2 && !m[3]) { let y = new Date().getFullYear(); const mo = MES_ES[strip(m[2]).slice(0, 3)]; const iso = mo ? realDate(y, mo, m[1]) : null; if (iso && iso > todayISO()) y--; dateStr += ' ' + y; }
+  const rest = (text.slice(0, m.index) + ' ' + text.slice(m.index + m[0].length)).replace(/\s+/g, ' ').trim();
+  const toks = rest ? rest.split(' ') : [], desc = [], amts = [];
+  for (let i = 0; i < toks.length; i++) {
+    let tk = toks[i];
+    if (/^[$(\-+]+$/.test(tk) && i + 1 < toks.length && /^\(?\d/.test(toks[i + 1])) { tk = tk + toks[i + 1]; i++; }
+    const core = tk.replace(/[$()+\-\s]/g, '');
+    if (/^\d{1,3}([.,]\d{3})+([.,]\d{1,2})?$/.test(core) || /^\d+[.,]\d{2}$/.test(core) || (/^\d{4,}$/.test(core) && /[$\-+(]/.test(tk))) amts.push(tk); else desc.push(tk);
+  }
+  if (!amts.length) return null;
+  const d = desc.join(' ').replace(/\b\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?\b/g, ' ').replace(/\s+/g, ' ').trim();
+  return [dateStr, d].concat(amts.slice(0, 3));
+}
+async function readPdf(u8) {
+  let lib;
+  try { lib = await import('./pdf-lib.js'); } catch (e) { throw new Error('No pude cargar el lector de PDF. Revisa tu conexión e intenta de nuevo.'); }
+  lib.GlobalWorkerOptions.workerSrc = new URL('./pdf-worker.js', location.href).href;
+  let doc;
+  try { doc = await lib.getDocument({ data: u8, isEvalSupported: false }).promise; }
+  catch (e) { throw new Error(e && e.name === 'PasswordException' ? 'Ese PDF tiene contraseña. Quítasela y vuelve a subirlo.' : 'No pude abrir ese PDF.'); }
+  const rows = []; let anyText = false;
+  for (let pn = 1; pn <= doc.numPages; pn++) {
+    const page = await doc.getPage(pn), tc = await page.getTextContent();
+    const items = tc.items.filter(it => it.str && it.str.trim()).map(it => ({ s: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0 }));
+    if (items.length) anyText = true;
+    items.sort((a, b) => b.y - a.y || a.x - b.x);
+    const groups = []; let cur = null;
+    items.forEach(it => { if (cur && Math.abs(cur.y - it.y) <= 3) cur.items.push(it); else { cur = { y: it.y, items: [it] }; groups.push(cur); } });
+    groups.forEach(g => {
+      g.items.sort((a, b) => a.x - b.x);
+      let line = '', prev = null;
+      g.items.forEach(it => { if (prev && it.x - (prev.x + prev.w) > 1.5 && !/\s$/.test(line) && !/^\s/.test(it.s)) line += ' '; line += it.s; prev = it; });
+      const r = pdfLineToRow(line.replace(/\s+/g, ' ').trim());
+      if (r) rows.push(r);
+    });
+  }
+  if (!anyText) throw new Error('Ese PDF parece ser una imagen escaneada y no tiene texto que pueda leer. Pídele a tu banco el extracto en Excel o CSV.');
+  if (!rows.length) throw new Error('No encontré movimientos con fecha y monto en ese PDF.');
+  const na = Math.max(...rows.map(r => r.length - 2));
+  const head = ['Fecha', 'Descripción'].concat(['Valor 1', 'Valor 2', 'Valor 3'].slice(0, na));
+  return [{ name: 'PDF', rows: [head].concat(rows.map(r => { const a = r.slice(); while (a.length < head.length) a.push(''); return a; })) }];
+}
+async function readFileAny(file) {
+  const buf = await file.arrayBuffer(), u8 = new Uint8Array(buf);
+  if (u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46) return { kind: 'pdf', sheets: await readPdf(u8) };
+  if (u8[0] === 0x50 && u8[1] === 0x4B) return { kind: 'xlsx', sheets: await readXlsx(buf) };
+  if (u8[0] === 0xD0 && u8[1] === 0xCF && u8[2] === 0x11 && u8[3] === 0xE0) throw new Error('Ese es un Excel antiguo (.xls). Ábrelo en Excel y guárdalo como .xlsx o como CSV, y vuelve a subirlo.');
+  const rows = readCsv(decodeText(u8));
+  if (!rows.length) throw new Error('Ese archivo está vacío.');
+  return { kind: 'csv', sheets: [{ name: 'CSV', rows: rows }] };
+}
+
+/* detección de columnas */
+function guessHeader(rows) {
+  const kw = /fecha|date|descrip|concepto|detalle|monto|valor|importe|ingreso|egreso|gasto|categor|tipo|medio|cuenta/;
+  for (let i = 0; i < Math.min(rows.length, 25); i++) {
+    const hits = (rows[i] || []).map(c => strip(String(c == null ? '' : c))).filter(c => c && c.length < 40 && kw.test(c)).length;
+    if (hits >= 2) return i + 1;
+  }
+  for (let i = 0; i < Math.min(rows.length, 40); i++) {
+    const r = rows[i] || [];
+    if (r.some(c => parseDateCell(c, 'dmy')) && r.some(c => typeof c === 'number' || (typeof c === 'string' && /^[\s$()\-+\d.,]+$/.test(c) && isFinite(parseMoney(c))))) return i;
+  }
+  return 0;
+}
+function guessMap(rows, hdr) {
+  const n = Math.max(0, ...rows.slice(0, 60).map(r => (r || []).length));
+  const H = hdr > 0 ? (rows[hdr - 1] || []).map(c => strip(String(c == null ? '' : c))) : [];
+  const map = { date: -1, desc: -1, amt: -1, inc: -1, exp: -1, tipo: -1, cat: -1, med: -1 }, used = new Set();
+  const take = (f, rx) => { const i = H.findIndex((h, k) => h && !used.has(k) && rx.test(h)); if (i >= 0) { map[f] = i; used.add(i); } };
+  take('date', /fecha|date|^dia$/); take('inc', /ingres|entrada|abono|deposito|credito/); take('exp', /egres|gasto|salida|cargo|retiro|debito/);
+  take('tipo', /\btipo\b|clase|naturaleza/); take('cat', /categor|rubro|clasific/); take('med', /medio|metodo|forma de pago|cuenta|banco|pago/);
+  take('amt', /monto|valor|importe|cantidad|total|amount/); take('desc', /descrip|concepto|detalle|nota|movimiento|referencia|comentario|item|observ/);
+  const data = rows.slice(hdr, hdr + 60);
+  const score = (i, fn) => data.reduce((a, r) => a + (fn((r || [])[i]) ? 1 : 0), 0);
+  const bestCol = fn => { let b = -1, bs = 0; for (let i = 0; i < n; i++) if (!used.has(i)) { const sc = score(i, fn); if (sc > bs) { bs = sc; b = i; } } return { b: b, bs: bs }; };
+  if (map.date < 0) { const r = bestCol(v => parseDateCell(v, 'dmy')); if (r.bs >= 2) { map.date = r.b; used.add(r.b); } }
+  if (map.amt < 0 && map.inc < 0 && map.exp < 0) { const r = bestCol(v => typeof v === 'number' || (typeof v === 'string' && /^[\s$()\-+\d.,]+$/.test(v) && /\d/.test(v) && isFinite(parseMoney(v)))); if (r.bs >= 2) { map.amt = r.b; used.add(r.b); } }
+  if (map.desc < 0) { let b = -1, bl = 0; for (let i = 0; i < n; i++) if (!used.has(i)) { const avg = data.reduce((a, r) => a + (typeof (r || [])[i] === 'string' && !parseDateCell((r || [])[i], 'dmy') ? String(r[i]).length : 0), 0) / Math.max(1, data.length); if (avg > bl) { bl = avg; b = i; } } if (b >= 0 && bl >= 3) { map.desc = b; used.add(b); } }
+  return map;
+}
+function autoRule(sh, st) {
+  const m = st.map;
+  if (m.inc >= 0 || m.exp >= 0) return 'cols';
+  if (m.tipo >= 0) return 'tipo';
+  const nm = strip(sh.name || '');
+  if (/ingres|entrad/.test(nm) && !/egres|gast/.test(nm)) return 'allin';
+  if (/egres|gast|salid/.test(nm) && !/ingres/.test(nm)) return 'allout';
+  if (m.amt >= 0) for (let i = st.hdr; i < Math.min(sh.rows.length, st.hdr + 400); i++) { const v = parseMoney((sh.rows[i] || [])[m.amt]); if (isFinite(v) && v < 0) return 'sign'; }
+  return 'text';
+}
+
+/* convertir filas del archivo en movimientos */
+function impCompute(st) {
+  const sheets = st.sel === 'all' ? st.sheets : [st.sheets[st.sel]];
+  const m = st.map, planned = { out: {}, in: {}, med: {} }, newNames = { out: [], in: [], med: [] };
+  const ign = { nodate: 0, noamt: 0, skip: 0 };
+  const plan = (kind, list, raw) => {
+    const hit = findByName(list, raw);
+    if (hit) return hit.name;
+    if (!st.create) return null;
+    const k = normKey(raw);
+    if (!planned[kind][k]) { planned[kind][k] = capName(raw); newNames[kind].push(planned[kind][k]); }
+    return planned[kind][k];
+  };
+  const cellOf = (r, i) => (i >= 0 ? r[i] : undefined);
+  const val = x => { const v = parseMoney(x); return isFinite(v) ? v : 0; };
+  let out = [];
+  sheets.forEach(sh => {
+    const rule = st.rule === 'auto' ? autoRule(sh, st) : st.rule;
+    for (let ri = st.hdr; ri < sh.rows.length; ri++) {
+      const r = sh.rows[ri] || [];
+      if (r.every(c => c === '' || c == null)) continue;
+      const d = parseDateCell(cellOf(r, m.date), st.dmy);
+      if (!d) { ign.nodate++; continue; }
+      const desc0 = String(cellOf(r, m.desc) == null ? '' : cellOf(r, m.desc)).trim();
+      if (/^(saldo|total|subtotal|suma)\b/i.test(strip(desc0))) { ign.skip++; continue; }
+      const catRaw = String(cellOf(r, m.cat) == null ? '' : cellOf(r, m.cat)).trim();
+      let t = null, a = 0;
+      if (rule === 'cols') {
+        const iv = Math.abs(val(cellOf(r, m.inc))), ev = Math.abs(val(cellOf(r, m.exp)));
+        if (iv > 0 && ev === 0) { t = 'in'; a = iv; } else if (ev > 0 && iv === 0) { t = 'out'; a = ev; } else if (iv > 0 && ev > 0) { t = iv >= ev ? 'in' : 'out'; a = Math.abs(iv - ev); }
+      } else {
+        const v = parseMoney(cellOf(r, m.amt));
+        if (isFinite(v) && v !== 0) {
+          a = Math.abs(v);
+          if (rule === 'allout') t = 'out'; else if (rule === 'allin') t = 'in';
+          else if (rule === 'sign') t = v < 0 ? 'out' : 'in'; else if (rule === 'signinv') t = v < 0 ? 'in' : 'out';
+          else if (rule === 'tipo') t = tipoOf(String(cellOf(r, m.tipo) == null ? '' : cellOf(r, m.tipo))) || (textIsIncome(desc0, catRaw) ? 'in' : 'out');
+          else t = textIsIncome(desc0, catRaw) ? 'in' : 'out';
+        }
+      }
+      a = Math.round(a);
+      if (!t || !(a > 0)) { ign.noamt++; continue; }
+      const list = t === 'in' ? INC : OUT;
+      let c = null;
+      if (catRaw) c = plan(t, list, catRaw);
+      if (!c) c = detectCat(t, desc0 || catRaw);
+      const medRaw = String(cellOf(r, m.med) == null ? '' : cellOf(r, m.med)).trim();
+      let md = null;
+      if (medRaw) md = plan('med', MEDIOS, medRaw);
+      else if (m.med < 0) md = detectMed(desc0);
+      const o = { t: t, a: a, c: c, n: desc0 ? capName(desc0).slice(0, 80) : c, d: d, r: desc0 };
+      if (md) o.m = md;
+      out.push(o);
+    }
+  });
+  let dup = 0;
+  if (st.dup) {
+    const have = {};
+    Store.all().forEach(x => { const k = x.d + '|' + x.t + '|' + x.a + '|' + normKey(x.n).slice(0, 40); have[k] = (have[k] || 0) + 1; });
+    out = out.filter(x => { const k = x.d + '|' + x.t + '|' + x.a + '|' + normKey(x.n).slice(0, 40); if (have[k] > 0) { have[k]--; dup++; return false; } return true; });
+  }
+  let min = '9999', max = '0000', nOut = 0, nIn = 0, sOut = 0, sIn = 0;
+  out.forEach(x => { if (x.d < min) min = x.d; if (x.d > max) max = x.d; if (x.t === 'in') { nIn++; sIn += x.a; } else { nOut++; sOut += x.a; } });
+  return { rows: out, dup: dup, ign: ign, newNames: newNames, min: min, max: max, nOut: nOut, nIn: nIn, sOut: sOut, sIn: sIn };
+}
+
+const IMP_FIELDS = [['date', 'Fecha'], ['desc', 'Descripción'], ['amt', 'Monto'], ['inc', 'Ingreso (columna aparte)'], ['exp', 'Gasto (columna aparte)'], ['tipo', 'Tipo (ingreso o gasto)'], ['cat', 'Categoría'], ['med', 'Medio de pago']];
+const IMP_RULES = [['auto', 'Automático'], ['cols', 'Columnas separadas de ingreso y gasto'], ['tipo', 'Según la columna Tipo'], ['sign', 'Signo del monto: negativo es gasto'], ['signinv', 'Signo del monto: positivo es gasto'], ['text', 'Según palabras de la descripción'], ['allout', 'Todo son gastos'], ['allin', 'Todo son ingresos']];
+const impSheet = st => (st.sel === 'all' ? st.sheets[0] : st.sheets[st.sel]);
+const fmtD = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(2, 4);
+function impInit(res, name) {
+  const st = { name: name, kind: res.kind, sheets: res.sheets, sel: 0, hdr: 0, map: null, rule: 'auto', dmy: 'dmy', dup: true, create: true, parsed: null };
+  if (st.sheets.length > 1) {
+    const sig = sh => { const h = guessHeader(sh.rows); return h + '|' + (h > 0 ? (sh.rows[h - 1] || []).map(normKey).join(',') : ''); };
+    const s0 = sig(st.sheets[0]);
+    st.sel = guessHeader(st.sheets[0].rows) > 0 && st.sheets.every(sh => sig(sh) === s0) ? 'all' : 0;
+  }
+  const sh = impSheet(st);
+  st.hdr = guessHeader(sh.rows); st.map = guessMap(sh.rows, st.hdr);
+  S.imp = st;
+}
+function impHTML() {
+  const st = S.imp;
+  if (st.loading) return '<p class="none">Leyendo ' + esc(st.loading) + '…</p>';
+  const sh = impSheet(st);
+  const n = Math.max(1, ...sh.rows.slice(0, 80).map(r => (r || []).length));
+  const H = st.hdr > 0 ? (sh.rows[st.hdr - 1] || []) : [];
+  const colOpts = sel => {
+    let o = '<option value="-1">(ninguna)</option>';
+    for (let i = 0; i < n; i++) { const h = String(H[i] == null ? '' : H[i]).trim().slice(0, 22); o += '<option value="' + i + '"' + (i === sel ? ' selected' : '') + '>' + colName(i) + (h ? ' · ' + esc(h) : '') + '</option>'; }
+    return o;
+  };
+  const sheetSel = st.sheets.length > 1 ? '<label class="imp-f"><span>Hoja</span><select id="imp-sheet"><option value="all"' + (st.sel === 'all' ? ' selected' : '') + '>Todas las hojas (mismo formato)</option>' + st.sheets.map((x, i) => '<option value="' + i + '"' + (st.sel === i ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></label>' : '';
+  const nc = Math.min(n, 8);
+  const sample = '<table class="mini"><thead><tr><th></th>' + Array.from({ length: nc }, (_, c) => '<th>' + colName(c) + '</th>').join('') + '</tr></thead><tbody>' +
+    sh.rows.slice(0, 6).map((r, ri) => '<tr><td class="rn">' + (ri + 1) + '</td>' + Array.from({ length: nc }, (_, c) => '<td>' + esc(String((r || [])[c] == null ? '' : r[c]).slice(0, 28)) + '</td>').join('') + '</tr>').join('') + '</tbody></table>';
+  return '<section class="card imp" id="imp"><div class="imp-top"><h2>Importar historial</h2><span class="set-p" style="margin:0">' + esc(st.name) + (st.kind === 'pdf' ? ' · lectura de PDF (experimental)' : '') + '</span></div>' +
+    '<p class="set-p">Revisa que cada dato esté en la columna correcta. Si algo no cuadra, cámbialo aquí y la vista previa se actualiza.</p>' +
+    '<details class="tbl"><summary>Así se ve tu archivo</summary><div class="tscroll">' + sample + '</div></details>' +
+    '<div class="imp-grid">' + sheetSel +
+    '<label class="imp-f"><span>Fila de encabezados (0 si no hay)</span><input id="imp-hdr" type="number" min="0" max="200" value="' + st.hdr + '"></label>' +
+    IMP_FIELDS.map(f => '<label class="imp-f"><span>' + f[1] + '</span><select data-f="' + f[0] + '">' + colOpts(st.map[f[0]]) + '</select></label>').join('') +
+    '<label class="imp-f"><span>Cómo saber si es gasto o ingreso</span><select id="imp-rule">' + IMP_RULES.map(x => '<option value="' + x[0] + '"' + (st.rule === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select></label>' +
+    '<label class="imp-f"><span>Formato de fecha</span><select id="imp-dmy"><option value="dmy"' + (st.dmy === 'dmy' ? ' selected' : '') + '>Día/mes/año (12/10/2025 es 12 de octubre)</option><option value="mdy"' + (st.dmy === 'mdy' ? ' selected' : '') + '>Mes/día/año (12/10/2025 es 10 de diciembre)</option></select></label></div>' +
+    '<label class="imp-chk"><input id="imp-dup" type="checkbox"' + (st.dup ? ' checked' : '') + '>Omitir los que ya tengo (misma fecha, monto y descripción)</label>' +
+    '<label class="imp-chk"><input id="imp-create" type="checkbox"' + (st.create ? ' checked' : '') + '>Crear las categorías y medios nuevos que vengan en el archivo</label>' +
+    '<div id="impPrev"></div>' +
+    '<div class="imp-foot"><button type="button" class="btn ghost" id="imp-cancel">Cancelar</button><button type="button" class="btn primary" id="imp-go" disabled>Importar</button></div></section>';
+}
+function impPreview() {
+  const st = S.imp, box = $('#impPrev'); if (!box) return;
+  const res = impCompute(st); st.parsed = res;
+  const today = todayISO();
+  let h = '';
+  if (!res.rows.length) {
+    h += '<p class="imp-sum">No hay movimientos para importar con esta configuración.' + (res.dup ? ' ' + res.dup + ' ya estaban guardados.' : '') + '</p>';
+    if (res.ign.nodate) h += '<p class="imp-warn">No pude leer la fecha en ' + res.ign.nodate + ' filas. Revisa la fila de encabezados y la columna de fecha.</p>';
+    if (res.ign.noamt) h += '<p class="imp-warn">' + res.ign.noamt + ' filas no tienen un monto que pueda leer. Revisa la columna de monto y cómo saber si es gasto o ingreso.</p>';
+  } else {
+    h += '<p class="imp-sum">Encontré <b>' + nf.format(res.rows.length) + '</b> movimientos: ' + res.nOut + ' gastos por <b>' + money(res.sOut) + '</b> y ' + res.nIn + ' ingresos por <b>' + money(res.sIn) + '</b>, del ' + fmtD(res.min) + ' al ' + fmtD(res.max) + '.</p>';
+    if (res.dup) h += '<p class="imp-sum">' + res.dup + ' ya los tenías y los omito.</p>';
+    const ig = res.ign.nodate + res.ign.noamt + res.ign.skip;
+    if (ig) h += '<p class="imp-sum" style="color:var(--muted)">' + ig + ' filas ignoradas (sin fecha válida: ' + res.ign.nodate + ', sin monto: ' + res.ign.noamt + ', saldos o totales: ' + res.ign.skip + ').</p>';
+    const nn = res.newNames; const parts = [];
+    if (nn.out.length) parts.push('categorías de gasto: ' + nn.out.map(esc).join(', '));
+    if (nn.in.length) parts.push('fuentes de ingreso: ' + nn.in.map(esc).join(', '));
+    if (nn.med.length) parts.push('medios de pago: ' + nn.med.map(esc).join(', '));
+    if (parts.length) h += '<p class="imp-sum">Voy a crear ' + parts.join(' · ') + '.</p>';
+    if (res.min < '2015-01-01' || res.max > addDaysISO(today, 366)) h += '<p class="imp-warn">Hay fechas muy antiguas o muy futuras. Revisa el formato de fecha (día/mes o mes/día).</p>';
+    h += '<div class="tscroll"><table class="mini"><thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Medio</th><th>Monto</th></tr></thead><tbody>' +
+      res.rows.slice(0, 8).map(x => '<tr><td>' + fmtD(x.d) + '</td><td>' + esc(x.n) + '</td><td>' + esc(x.c) + '</td><td>' + esc(x.m || '—') + '</td><td class="mono ' + x.t + '">' + (x.t === 'in' ? '+' : '−') + money(x.a) + '</td></tr>').join('') + '</tbody></table></div>' +
+      (res.rows.length > 8 ? '<p class="set-p" style="margin:6px 0 0">Y ' + nf.format(res.rows.length - 8) + ' más.</p>' : '');
+  }
+  box.innerHTML = h;
+  const go = $('#imp-go');
+  go.disabled = !res.rows.length; go.textContent = res.rows.length ? 'Importar ' + nf.format(res.rows.length) : 'Importar';
+}
+function impPick(input) {
+  const f = input.files && input.files[0]; if (!f) return;
+  input.value = '';
+  S.imp = { loading: f.name }; render();
+  readFileAny(f).then(res => { impInit(res, f.name); render(); }).catch(err => { S.imp = null; render(); toast(err && err.message ? err.message : 'No pude leer ese archivo.'); });
+}
+function impChange(t) {
+  const st = S.imp; if (!st || st.loading) return;
+  if (t.id === 'imp-sheet') { st.sel = t.value === 'all' ? 'all' : Number(t.value); const sh = impSheet(st); st.hdr = guessHeader(sh.rows); st.map = guessMap(sh.rows, st.hdr); render(); return; }
+  if (t.id === 'imp-hdr') { st.hdr = Math.max(0, Math.min(200, Math.floor(Number(t.value) || 0))); st.map = guessMap(impSheet(st).rows, st.hdr); render(); return; }
+  if (t.dataset && t.dataset.f) { st.map[t.dataset.f] = Number(t.value); impPreview(); return; }
+  if (t.id === 'imp-rule') st.rule = t.value; else if (t.id === 'imp-dmy') st.dmy = t.value; else if (t.id === 'imp-dup') st.dup = t.checked; else if (t.id === 'imp-create') st.create = t.checked;
+  impPreview();
+}
+function impCommit() {
+  const st = S.imp, res = st && st.parsed;
+  if (!res || !res.rows.length) return;
+  const rows = res.rows.map(x => { const y = Object.assign({}, x); y.c = Store.ensure(y.t, y.c); if (y.m) y.m = Store.ensure('med', y.m); y.id = Store.newId(); return y; });
+  Store.cfgCommit(true);
+  const ids = rows.map(x => x.id);
+  let latest = rows.reduce((a, x) => (x.d > a ? x.d : a), '0000');
+  const today = todayISO();
+  if (latest > today) { const past = rows.filter(x => x.d <= today).reduce((a, x) => (x.d > a ? x.d : a), '0000'); if (past !== '0000') latest = past; }
+  S.imp = null; S.tab = 'resumen'; S.month = latest.slice(0, 7);
+  Store.addMany(rows);
+  toast('Importé ' + nf.format(rows.length) + ' movimientos.', () => { Store.remove(ids); });
+}
+
 function download(name, text, type) {
   const file = new File([text], name, { type: type });
   const mobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
@@ -873,7 +1463,7 @@ function exportCSV() {
   download('my-money.csv', csv, 'text/csv');
 }
 let deferredPrompt = null, wipeArmed = false;
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; if (S.tab === 'datos') render(); });
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt = e; if (S.tab === 'ajustes') render(); });
 
 function render() {
   const ae = document.activeElement;
@@ -883,7 +1473,8 @@ function render() {
   document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t.dataset.tab === S.tab)));
   const v = $('#view');
   if (!Store.ready()) { v.innerHTML = '<p class="none">Cargando tus movimientos…</p>'; return; }
-  v.innerHTML = S.tab === 'resumen' ? viewResumen() : S.tab === 'diario' ? viewDiario() : S.tab === 'presupuestos' ? viewPresu() : viewDatos();
+  if (S.imp) { v.innerHTML = impHTML(); if (!S.imp.loading) impPreview(); return; }
+  v.innerHTML = S.tab === 'resumen' ? viewResumen() : S.tab === 'diario' ? viewDiario() : S.tab === 'presupuestos' ? viewPresu() : viewAjustes();
   if (S.tab === 'resumen') drawCharts();
   if (S.tab === 'diario') paintDiary();
 }
@@ -891,7 +1482,7 @@ function render() {
 /* ───────────── eventos ───────────── */
 $('#prev').onclick = () => { S.month = shiftMonth(S.month, -1); render(); };
 $('#next').onclick = () => { if (S.month < todayISO().slice(0, 7)) { S.month = shiftMonth(S.month, 1); render(); } };
-document.querySelectorAll('.tab').forEach(t => { t.onclick = () => { S.tab = t.dataset.tab; render(); }; });
+document.querySelectorAll('.tab').forEach(t => { t.onclick = () => { S.tab = t.dataset.tab; S.imp = null; render(); }; });
 
 function demoLines() {
   let seed = 20261012;
@@ -921,6 +1512,22 @@ function demoLines() {
 }
 
 $('#app').addEventListener('click', e => {
+  const cd = e.target.closest('[data-cdel]');
+  if (cd) {
+    const li = cd.closest('.cfg-row'), kind = li.dataset.k, name = li.dataset.n;
+    if (cd.dataset.armed !== '1') {
+      const n = Store.usage(kind)[name] || 0;
+      cd.dataset.armed = '1'; cd.classList.add('armed'); cd.textContent = n ? 'Borrar (' + n + ' mov.)' : 'Borrar';
+      setTimeout(() => { if (cd.isConnected) { cd.dataset.armed = ''; cd.classList.remove('armed'); cd.textContent = '✕'; } }, 4000);
+      return;
+    }
+    const r = Store.cfgDelete(kind, name);
+    if (r.err) toast(r.err);
+    else toast('Borré "' + name + '".' + (r.moved ? ' ' + r.moved + ' ' + (r.to ? (r.moved === 1 ? 'movimiento pasó a ' : 'movimientos pasaron a ') + r.to + '.' : (r.moved === 1 ? 'movimiento quedó sin medio de pago.' : 'movimientos quedaron sin medio de pago.')) : ''));
+    return;
+  }
+  if (e.target.closest('#imp-cancel')) { S.imp = null; render(); return; }
+  if (e.target.closest('#imp-go')) { impCommit(); return; }
   const del = e.target.closest('[data-del]');
   if (del) { const removed = Store.remove([del.dataset.del]); if (removed.length) toast('Eliminado: ' + removed[0].n, () => Store.addMany(removed)); return; }
   const ty = e.target.closest('[data-type]');
@@ -942,12 +1549,25 @@ $('#app').addEventListener('click', e => {
     const sums = {}, keys = [-1, -2, -3].map(n => shiftMonth(S.month, n)).filter(k => Store.month(k).length);
     if (!keys.length) { toast('Necesito al menos un mes anterior con gastos para sugerir topes.'); return; }
     keys.forEach(k => { const t = catTotals(Store.month(k)); Object.keys(t).forEach(c => { sums[c] = (sums[c] || 0) + t[c] / keys.length; }); });
-    const next = {}; Object.keys(sums).forEach(c => { if (c !== 'Ahorro' && c !== 'Otros') next[c] = Math.ceil(sums[c] * 1.05 / 10000) * 10000; });
+    const skip = new Set(OUT.filter(c => c.nb || c.fb).map(c => c.name)); const next = {}; Object.keys(sums).forEach(c => { if (!skip.has(c)) next[c] = Math.ceil(sums[c] * 1.05 / 10000) * 10000; });
     Store.setBudgets(Object.assign({}, Store.budgets(), next));
     toast('Topes sugeridos con el promedio de ' + keys.length + (keys.length === 1 ? ' mes' : ' meses') + ' más 5%.');
   }
 });
 $('#app').addEventListener('change', e => {
+  const t = e.target;
+  if (t.id === 'impFile') { impPick(t); return; }
+  if (t.closest && t.closest('#imp')) { impChange(t); return; }
+  const cn = t.closest && t.closest('.cfg-name');
+  if (cn) {
+    const li = cn.closest('.cfg-row'), old = li.dataset.n;
+    if (cn.value.trim() === old) { cn.value = old; return; }
+    const r = Store.cfgRename(li.dataset.k, old, cn.value);
+    if (r.err) { cn.value = old; toast(r.err); } else { li.dataset.n = r.ok; cn.value = r.ok; const kw = li.querySelector('.cfg-kw'); if (kw) kw.setAttribute('aria-label', 'Palabras clave de ' + r.ok); }
+    return;
+  }
+  const ck = t.closest && t.closest('.cfg-kw');
+  if (ck) { const li = ck.closest('.cfg-row'); Store.cfgKw(li.dataset.k, li.dataset.n, ck.value); ck.value = kwList(ck.value).join(', '); return; }
   if (e.target.id === 'restore') {
     const f = e.target.files && e.target.files[0]; if (!f) return;
     f.text().then(t => { const n = Store.restore(JSON.parse(t)); toast(n ? 'Restauré ' + n + ' movimientos.' : 'El respaldo no tenía movimientos nuevos.'); }).catch(() => toast('No pude leer ese archivo. Usa un respaldo descargado desde My Money.'));
@@ -967,6 +1587,18 @@ $('#app').addEventListener('change', e => {
   }
 });
 $('#app').addEventListener('input', e => { if (e.target.id === 'q') { S.q = e.target.value; paintDiary(); } });
+$('#app').addEventListener('submit', e => {
+  const f = e.target.closest && e.target.closest('.cfg-add'); if (!f) return;
+  e.preventDefault();
+  const kind = f.dataset.k, r = Store.cfgAdd(kind, $('#add-' + kind).value, $('#addkw-' + kind).value);
+  if (r.err) { toast(r.err); return; }
+  toast('Agregué "' + r.ok + '".');
+  const el = $('#add-' + kind); if (el) el.focus();
+});
+$('#app').addEventListener('toggle', e => {
+  const d = e.target;
+  if (d && d.matches && d.matches('details.cfg')) { const k = d.dataset.k; S.open = S.open.filter(x => x !== k); if (d.open) S.open.push(k); }
+}, true);
 
 /* importar */
 function togglePanel(open) {
@@ -993,9 +1625,9 @@ $('#bulkGo').onclick = () => {
 
 /* compositor tipo chat */
 const msg = $('#msg'), pv = $('#pv'), send = $('#send'), mrow = $('#mrow');
-const MCHIPS = [['Efectivo', 'Efectivo'], ['Nequi', 'Nequi'], ['Daviplata', 'Daviplata'], ['Tarjeta débito', 'Débito'], ['Tarjeta crédito', 'Crédito'], ['Transferencia', 'Transfer.']];
 function drawMrow() {
-  mrow.innerHTML = MCHIPS.map(m => '<button type="button" class="mchip" data-m="' + m[0] + '" aria-pressed="' + (S.medio === m[0]) + '">' + m[1] + '</button>').join('');
+  if (S.medio && !MEDIOS.some(m => m.name === S.medio)) S.medio = null;
+  mrow.innerHTML = MEDIOS.map(m => '<button type="button" class="mchip" data-m="' + esc(m.name) + '" aria-pressed="' + (S.medio === m.name) + '">' + esc(m.name) + '</button>').join('');
 }
 mrow.addEventListener('click', e => {
   const b = e.target.closest('.mchip'); if (!b) return;
@@ -1035,6 +1667,7 @@ try {
 } catch (e) {}
 
 Store.sub(render);
+Store.sub(drawMrow);
 render();
 Store.init();
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {})); }

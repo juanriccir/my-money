@@ -1,6 +1,6 @@
 // Service worker de My Money: deja la app disponible sin conexión.
 // Si cambias index.html, sube el número de VERSION para que los celulares se actualicen.
-const VERSION = 'my-money-v1';
+const VERSION = 'my-money-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
