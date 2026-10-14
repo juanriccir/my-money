@@ -325,6 +325,10 @@ table.mini { font-size: .8rem; }
 table.mini th, table.mini td { text-align: left; }
 table.mini td.mono { text-align: right; }
 table.mini th, table.mini td { padding: 5px 8px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+.banner-b{display:flex;gap:8px;flex-wrap:wrap}
+details.paste{margin-top:14px;border-top:1px solid var(--line,#2a2a2e);padding-top:12px}
+details.paste summary{cursor:pointer;color:var(--gold,#c9a24a);font-size:.9rem}
+details.paste textarea{width:100%;margin-top:10px;background:#0a0a0b;color:inherit;border:1px solid #2a2a2e;border-radius:10px;padding:10px;font:inherit;font-size:.85rem;resize:vertical}
 </style>
 </head>
 <body>
@@ -419,16 +423,16 @@ const D = (n, kw, o) => Object.assign({ n: n, k: (kw || '').split(' ').filter(Bo
 const DEFAULT_CFG = {
   out: [
     D('Mercado', 'mercado supermercado exito jumbo carulla olimpica d1 ara fruver frutas verduras plaza'),
-    D('Restaurantes', 'almuerzo cena desayuno restaurante comida cafe cerveza cervezas pizza hamburguesa domicilio rappi helado postre snack empanada empanadas corrientazo panaderia pan'),
-    D('Transporte', 'taxi uber didi cabify indriver bus mio metro gasolina parqueadero peaje moto pasaje transporte soat tecnomecanica'),
+    D('Restaurantes', 'almuerzo cena desayuno restaurante comida cafe cerveza cervezas pizza hamburguesa domicilio rappi helado postre snack empanada empanadas corrientazo panaderia pan dona donas pringles restaurant'),
+    D('Transporte', 'taxi taxis ubers uber didi cabify indriver bus mio metro gasolina parqueadero peaje moto pasaje transporte soat tecnomecanica'),
     D('Vivienda', 'arriendo alquiler administracion hipoteca predial reparacion muebles'),
-    D('Servicios', 'luz agua gas internet celular plan claro movistar tigo wom epm emcali energia servicio acueducto recarga'),
-    D('Salud', 'medico farmacia drogueria cita examen odontologo dentista eps medicina salud psicologo terapia'),
-    D('Ocio', 'cine netflix spotify salida fiesta bar discoteca concierto juego juegos steam viaje hotel paseo vacaciones disney hbo prime youtube trago tragos'),
-    D('Compras', 'ropa zapatos tenis amazon mercadolibre regalo compra electrodomestico zapatillas'),
+    D('Servicios', 'luz agua gas internet celular plan claro movistar tigo wom epm emcali energia servicio aguas acueducto recarga'),
+    D('Salud', 'medico farmacia drogueria cita examen odontologo dentista eps medicina salud psicologo terapia dolex'),
+    D('Ocio', 'cine netflix spotify salida fiesta bar discoteca concierto juego juegos steam viaje hotel paseo vacaciones disney hbo prime youtube trago tragos pub pubs tavern'),
+    D('Compras', 'ropa zapatos tenis amazon mercadolibre regalo compra electrodomestico zapatillas airpods celulares'),
     D('Educación', 'curso universidad matricula libro libros colegio clase platzi udemy pension'),
     D('Deudas', 'tarjeta credito cuota prestamo deuda'),
-    D('Cuidado personal', 'peluqueria barberia corte gimnasio gym spa manicure'),
+    D('Cuidado personal', 'peluqueria barberia corte gimnasio gym spa manicure proteina'),
     D('Mascotas', 'perro gato veterinario mascota concentrado'),
     D('Ahorro', 'ahorro cdt inversion fondo', { nb: 1 }),
     D('Otros', '', { fb: 1 })
@@ -782,11 +786,11 @@ document.addEventListener('pointerdown', onPoint);
 document.addEventListener('pointerleave', hideTip);
 
 const toastEl = $('#toast'); let toastTimer = null;
-function toast(msg, undo) {
-  toastEl.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button type="button" id="toastUndo">Deshacer</button>' : '');
+function toast(msg, undo, label, ms) {
+  toastEl.innerHTML = '<span>' + esc(msg) + '</span>' + (undo ? '<button type="button" id="toastUndo">' + esc(label || 'Deshacer') + '</button>' : '');
   toastEl.hidden = false;
   const u = $('#toastUndo'); if (u) u.onclick = () => { undo(); toastEl.hidden = true; };
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.hidden = true; }, undo ? 7000 : 4000);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.hidden = true; }, ms || (undo ? 7000 : 4000));
 }
 
 /* ───────────── gráficos ───────────── */
@@ -892,7 +896,16 @@ function emptyHTML() {
     '<p>Escribe abajo como en WhatsApp: <code>almuerzo 25k</code>, <code>+sueldo 3.8M</code> o <code>ayer taxi 12000</code>. Yo detecto el monto, la categoría y si es gasto o ingreso.</p>' +
     '<div class="empty-actions"><button class="btn primary" data-act="demo">Cargar datos de ejemplo</button><button class="btn" data-act="import">Pegar chat de WhatsApp</button></div></section>';
 }
+const APP_VERSION = '4';
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+function backupDue() {
+  const n = Store.all().filter(x => !x.demo).length; if (n < 10) return false;
+  const last = Number(lsGet('mymoney.backup')) || 0, snooze = Number(lsGet('mymoney.bksnooze')) || 0, now = Date.now();
+  return now - last > 14 * 864e5 && now > snooze;
+}
 function bannerHTML() {
+  if (backupDue()) return '<div class="banner"><span>Hace tiempo que no haces un respaldo de tus datos. Guárdalo en Archivos o Drive para no perderlos.</span><span class="banner-b"><button class="btn primary" data-act="backup">Respaldar</button><button class="btn" data-act="snoozebk">Luego</button></span></div>';
   return hasDemo() ? '<div class="banner"><span>Estás viendo datos de ejemplo.</span><button class="btn" data-act="cleardemo">Borrar ejemplos</button></div>' : '';
 }
 
@@ -1029,12 +1042,14 @@ function viewAjustes() {
   const kwHelp = ' Las palabras clave hacen que el chat y la importación la reconozcan solos, por ejemplo "arriendo, alquiler". El nombre también cuenta como palabra clave.';
   return '<div class="grid">' +
     '<section class="card span2"><h2>Importar historial</h2><p class="set-p">Sube tu Excel (.xlsx), un CSV o un PDF de extracto. Antes de guardar te muestro qué entendí, y puedes deshacer la importación.</p>' +
-    '<div class="set-actions"><label class="btn primary" for="impFile">Elegir archivo</label><input id="impFile" type="file" accept=".xlsx,.xlsm,.csv,.tsv,.txt,.pdf,application/pdf" hidden><button class="btn" data-act="import">Pegar mensajes de WhatsApp</button></div></section>' +
+    '<div class="set-actions"><label class="btn primary" for="impFile">Elegir archivo</label><input id="impFile" type="file" accept=".xlsx,.xlsm,.csv,.tsv,.txt,.pdf,application/pdf" hidden><button class="btn" data-act="import">Pegar mensajes de WhatsApp</button></div>' +
+    '<details class="paste"><summary>¿No te lee bien el archivo? Pega tus filas desde Excel</summary><p class="set-p">En Excel selecciona las filas (con el encabezado si lo tienes), copia y pega aquí. Luego te dejo elegir qué columna es cada cosa.</p><textarea id="pasteTxt" rows="5" placeholder="Pega aquí…" aria-label="Filas copiadas de Excel"></textarea><div class="set-actions"><button class="btn primary" data-act="pasteimp">Leer lo pegado</button></div></details></section>' +
     cfgCard('out', 'Categorías de gastos', 'Cambia el nombre, borra las que no uses o crea las tuyas.' + kwHelp, 'Ej. Suscripciones') +
     cfgCard('in', 'Fuentes de ingreso', 'Crea una por cada persona o empresa que te da plata, por ejemplo Papá.' + kwHelp, 'Ej. Papá') +
     cfgCard('med', 'Medios de pago', 'Cuenta de ahorros, Nequi, efectivo, la que uses. Si borras uno, sus movimientos quedan sin medio.' + kwHelp, 'Ej. Cuenta de ahorros') +
-    '<section class="card"><h2>Tus datos</h2><p class="set-p">Todo se guarda solo en este dispositivo y no se envía a internet. Ahora tienes <b>' + n + '</b> movimientos. Descarga un respaldo de vez en cuando por si cambias de celular o borras los datos del navegador.</p>' +
+    '<section class="card"><h2>Tus datos</h2><p class="set-p">Todo se guarda solo en este dispositivo y no se envía a internet. Ahora tienes <b>' + n + '</b> movimientos. <b>Si desinstalas la app, pierdes los datos</b>: antes descarga un respaldo (y guárdalo en Archivos o Drive).' + (lsGet('mymoney.backup') ? ' Último respaldo: ' + new Date(Number(lsGet('mymoney.backup'))).toLocaleDateString('es-CO') + '.' : ' Aún no has hecho ningún respaldo.') + '</p>' +
     '<div class="set-actions"><button class="btn primary" data-act="csv">Descargar para Excel</button><button class="btn" data-act="backup">Descargar respaldo</button><label class="btn" for="restore">Restaurar respaldo</label><input id="restore" type="file" accept=".json,application/json" hidden><button class="btn danger" data-act="wipe">Borrar todo</button></div></section>' +
+    '<section class="card"><h2>Versión de la app</h2><p class="set-p">My Money versión <b>' + APP_VERSION + '</b>. Se actualiza sola al abrirla. Si no ves un cambio reciente, fuerza la actualización: tus datos no se borran.</p><div class="set-actions"><button class="btn" data-act="update">Buscar actualización</button></div></section>' +
     '<section class="card"><h2>Instalar en el celular</h2>' + (standalone ? '<p class="okline" style="margin:8px 0 0">✓ Ya estás usando la app instalada.</p>' :
       '<ol class="howto"><li><b>Android (Chrome):</b> menú ⋮ y luego Instalar app.</li><li><b>iPhone (Safari):</b> botón Compartir y luego Añadir a pantalla de inicio.</li></ol>' + (deferredPrompt ? '<div class="set-actions" style="margin-top:12px"><button class="btn primary" data-act="install">Instalar app</button></div>' : '')) + '</section>' +
     '<section class="card span2"><h2>Cómo anotar en el chat</h2><ol class="howto"><li><code>almuerzo 25k nequi</code> es un gasto de $ 25.000 en Restaurantes, pagado con Nequi.</li><li><code>+sueldo 3.8M transferencia</code> es un ingreso. El signo + o palabras como sueldo, freelance o me pagaron lo marcan como ingreso.</li><li><code>ayer taxi 12000 efectivo</code> usa la fecha de ayer. También sirven hoy, anteayer o 5/10.</li><li>Montos: <code>25k</code>, <code>25 mil</code>, <code>1.5M</code>, <code>1,5 millones</code>, <code>25.000</code>. Si no escribes el medio, toca uno de los botones sobre la barra de escribir.</li><li>Para forzar categoría o medio: <code>cena 80k #ocio @tarjeta</code>. Funciona también con las que crees en Ajustes.</li></ol></section></div>';
@@ -1056,7 +1071,8 @@ function realDate(y, m, d) {
 }
 function parseDateCell(v, order) {
   if (v == null || v === '' || typeof v === 'number') return null;
-  const t = String(v).trim(); if (!t) return null;
+  let t = String(v).trim(); if (!t) return null;
+  t = t.replace(/^[A-Za-zÁÉÍÓÚáéíóúñÑ]{3,10}\.?,?\s+(?=\d)/, '');
   let m;
   if ((m = t.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})(?!\d)/))) return realDate(m[1], m[2], m[3]);
   if ((m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?!\d)/))) {
@@ -1064,7 +1080,7 @@ function parseDateCell(v, order) {
     if (mo > 12 && d <= 12) { const x = d; d = mo; mo = x; }
     return realDate(m[3], mo, d);
   }
-  if ((m = strip(t).match(/^(\d{1,2})\s*(?:de\s+)?([a-z]{3,})\.?,?\s*(?:de\s+)?(\d{2,4})/))) { const mo = MES_ES[m[2].slice(0, 3)]; if (mo) return realDate(m[3], mo, m[1]); }
+  if ((m = strip(t).match(/^(\d{1,2})[\s\-\/.]*(?:de\s+)?([a-z]{3,})\.?,?[\s\-\/.]*(?:de\s+)?(\d{2,4})/))) { const mo = MES_ES[m[2].slice(0, 3)]; if (mo) return realDate(m[3], mo, m[1]); }
   return null;
 }
 function parseMoney(v) {
@@ -1280,8 +1296,115 @@ function autoRule(sh, st) {
   return 'text';
 }
 
+/* ───── formato "tablas lado a lado": Ingresos a la izquierda, Egresos a la derecha, una hoja por mes ───── */
+function sheetYM(name) {
+  const t = strip(String(name || '')); let mo = null, y = null, m;
+  const re = /[a-z]+/g;
+  while ((m = re.exec(t))) { const k = MES_ES[m[0].slice(0, 3)]; if (k && m[0].length >= 3) { mo = k; break; } }
+  const yy = t.match(/(?:^|\D)(\d{4}|\d{2})(?!\d)/);
+  if (yy) { y = Number(yy[1]); if (y < 100) y += 2000; }
+  return { m: mo, y: y };
+}
+function detectBlocks(sheets) {
+  const all = []; let n = 0;
+  sheets.forEach(sh => {
+    const found = [];
+    for (let ri = 0; ri < Math.min(sh.rows.length, 25); ri++) {
+      const r = sh.rows[ri] || [];
+      for (let ci = 0; ci < r.length; ci++) {
+        const x = strip(String(r[ci] == null ? '' : r[ci])).replace(/[:\s]+$/, '').trim();
+        const t = /^(ingresos?|entradas?)$/.test(x) ? 'in' : /^(egresos?|gastos?|salidas?)$/.test(x) ? 'out' : null;
+        if (t) found.push({ t: t, r: ri, c: ci });
+      }
+    }
+    const blocks = [];
+    found.forEach(b => {
+      const row = sh.rows[b.r] || [];
+      const nextC = found.filter(o => o.r === b.r && o.c > b.c).map(o => o.c).sort((a, c) => a - c)[0];
+      const end = Math.min(b.c + 6, nextC == null ? 99 : nextC);
+      let val = -1, day = -1, med = -1;
+      for (let ci = b.c + 1; ci < end; ci++) {
+        const h = strip(String(row[ci] == null ? '' : row[ci]));
+        if (val < 0 && /valor|monto|importe/.test(h)) val = ci;
+        else if (day < 0 && /^(dia|fecha)/.test(h)) day = ci;
+        else if (med < 0 && /metodo|medio|pago/.test(h)) med = ci;
+      }
+      if (val >= 0) { b.val = val; b.day = day; b.med = med; blocks.push(b); }
+    });
+    n += blocks.length; all.push(blocks);
+  });
+  return { n: n, per: all };
+}
+function blockDate(v, sm, sy) {
+  if (v == null || v === '') return null;
+  let d, mo = null, y = null;
+  const iso = typeof v === 'string' ? parseDateCell(v, 'dmy') : null;
+  if (iso) { y = Number(iso.slice(0, 4)); mo = Number(iso.slice(5, 7)); d = Number(iso.slice(8, 10)); }
+  else if (typeof v === 'number') { if (v < 1 || v > 31) return null; d = Math.floor(v); }
+  else {
+    const m = strip(String(v)).match(/(\d{1,2})\s*(?:de\s+)?([a-z]{3,})?/); if (!m) return null;
+    d = Number(m[1]); if (m[2]) mo = MES_ES[m[2].slice(0, 3)] || null;
+  }
+  if (!mo) mo = sm; if (!mo) return null;
+  if (sy) { y = sy; if (sm) { if (mo < sm - 6) y++; else if (mo > sm + 6) y--; } }
+  else if (!y) y = new Date().getFullYear();
+  return realDate(y, mo, d);
+}
+function impComputeBlocks(st) {
+  const planned = { out: {}, in: {}, med: {} }, newNames = { out: [], in: [], med: [] };
+  const ign = { nodate: 0, noamt: 0, skip: 0 }, warn = [];
+  const plan = (kind, list, raw) => {
+    const hit = findByName(list, raw) || bestMatch(list, strip(raw));
+    if (hit) return hit.name;
+    if (!st.create) return null;
+    const k = normKey(raw);
+    if (!planned[kind][k]) { planned[kind][k] = capName(raw); newNames[kind].push(planned[kind][k]); }
+    return planned[kind][k];
+  };
+  let out = [];
+  st.sheets.forEach((sh, si) => {
+    const ym = sheetYM(sh.name);
+    st.blocks.per[si].forEach(b => {
+      let sum = 0, tot = null;
+      for (let ri = b.r + 1; ri < sh.rows.length; ri++) {
+        const r = sh.rows[ri] || [];
+        const label = String(r[b.c] == null ? '' : r[b.c]).trim();
+        if (/^total/.test(strip(label))) { const v = parseMoney(r[b.val]); if (isFinite(v)) tot = Math.abs(v); break; }
+        const raw = r[b.val];
+        if (!label && (raw == null || raw === '')) continue;
+        const v = parseMoney(raw);
+        if (!isFinite(v) || v === 0) { ign.noamt++; continue; }
+        const a = Math.round(Math.abs(v)); sum += a;
+        const d = b.day >= 0 ? blockDate(r[b.day], ym.m, ym.y) : null;
+        if (!d) { ign.nodate++; continue; }
+        const list = b.t === 'in' ? INC : OUT;
+        const desc = label || 'Sin descripción';
+        let c;
+        if (b.t === 'in') { c = (findByName(INC, desc) || bestMatch(INC, strip(desc))); c = c ? c.name : plan('in', INC, desc); }
+        else c = detectCat('out', desc);
+        const medRaw = b.med >= 0 ? String(r[b.med] == null ? '' : r[b.med]).trim() : '';
+        const md = medRaw ? plan('med', MEDIOS, medRaw) : null;
+        const o = { t: b.t, a: a, c: c || fallbackOf(list), n: capName(desc).slice(0, 80), d: d, r: desc };
+        if (md) o.m = md;
+        out.push(o);
+      }
+      if (tot != null && tot !== sum) warn.push('En "' + sh.name + '" los ' + (b.t === 'in' ? 'ingresos' : 'egresos') + ' suman ' + money(sum) + ' pero el total del Excel dice ' + money(tot) + '.');
+    });
+  });
+  let dup = 0;
+  if (st.dup) {
+    const have = {}, key = x => x.d + '|' + x.t + '|' + x.a + '|' + normKey(x.n).slice(0, 40);
+    Store.all().forEach(x => { const k = key(x); have[k] = (have[k] || 0) + 1; });
+    out = out.filter(x => { const k = key(x); if (have[k] > 0) { have[k]--; dup++; return false; } return true; });
+  }
+  let min = '9999', max = '0000', nOut = 0, nIn = 0, sOut = 0, sIn = 0;
+  out.forEach(x => { if (x.d < min) min = x.d; if (x.d > max) max = x.d; if (x.t === 'in') { nIn++; sIn += x.a; } else { nOut++; sOut += x.a; } });
+  return { rows: out, dup: dup, ign: ign, warn: warn, newNames: newNames, min: min, max: max, nOut: nOut, nIn: nIn, sOut: sOut, sIn: sIn };
+}
+
 /* convertir filas del archivo en movimientos */
 function impCompute(st) {
+  if (st.blocks) return impComputeBlocks(st);
   const sheets = st.sel === 'all' ? st.sheets : [st.sheets[st.sel]];
   const m = st.map, planned = { out: {}, in: {}, med: {} }, newNames = { out: [], in: [], med: [] };
   const ign = { nodate: 0, noamt: 0, skip: 0 };
@@ -1352,6 +1475,8 @@ const impSheet = st => (st.sel === 'all' ? st.sheets[0] : st.sheets[st.sel]);
 const fmtD = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(2, 4);
 function impInit(res, name) {
   const st = { name: name, kind: res.kind, sheets: res.sheets, sel: 0, hdr: 0, map: null, rule: 'auto', dmy: 'dmy', dup: true, create: true, parsed: null };
+  const bl = detectBlocks(res.sheets);
+  if (bl.n >= 2) { st.blocks = bl; S.imp = st; return; }
   if (st.sheets.length > 1) {
     const sig = sh => { const h = guessHeader(sh.rows); return h + '|' + (h > 0 ? (sh.rows[h - 1] || []).map(normKey).join(',') : ''); };
     const s0 = sig(st.sheets[0]);
@@ -1364,6 +1489,15 @@ function impInit(res, name) {
 function impHTML() {
   const st = S.imp;
   if (st.loading) return '<p class="none">Leyendo ' + esc(st.loading) + '…</p>';
+  if (st.blocks) {
+    const used = st.sheets.filter((x, i) => st.blocks.per[i].length).map(x => x.name);
+    return '<section class="card imp" id="imp"><div class="imp-top"><h2>Importar historial</h2><span class="set-p" style="margin:0">' + esc(st.name) + '</span></div>' +
+      '<p class="set-p">Reconocí tus tablas de <b>Ingresos</b> y <b>Egresos</b> en ' + used.length + (used.length === 1 ? ' hoja' : ' hojas') + ' (' + esc(used.slice(0, 4).join(', ')) + (used.length > 4 ? '…' : '') + '). El año lo tomo del nombre de cada pestaña, por ejemplo "Agosto 25" es agosto de 2025. Revisa el resumen y confirma.</p>' +
+      '<label class="imp-chk"><input id="imp-dup" type="checkbox"' + (st.dup ? ' checked' : '') + '>Omitir los que ya tengo (misma fecha, monto y descripción)</label>' +
+      '<label class="imp-chk"><input id="imp-create" type="checkbox"' + (st.create ? ' checked' : '') + '>Crear las fuentes de ingreso y medios nuevos que vengan en el archivo</label>' +
+      '<div id="impPrev"></div>' +
+      '<div class="imp-foot"><button type="button" class="btn ghost" id="imp-cancel">Cancelar</button><button type="button" class="btn primary" id="imp-go" disabled>Importar</button></div></section>';
+  }
   const sh = impSheet(st);
   const n = Math.max(1, ...sh.rows.slice(0, 80).map(r => (r || []).length));
   const H = st.hdr > 0 ? (sh.rows[st.hdr - 1] || []) : [];
@@ -1413,6 +1547,7 @@ function impPreview() {
       res.rows.slice(0, 8).map(x => '<tr><td>' + fmtD(x.d) + '</td><td>' + esc(x.n) + '</td><td>' + esc(x.c) + '</td><td>' + esc(x.m || '—') + '</td><td class="mono ' + x.t + '">' + (x.t === 'in' ? '+' : '−') + money(x.a) + '</td></tr>').join('') + '</tbody></table></div>' +
       (res.rows.length > 8 ? '<p class="set-p" style="margin:6px 0 0">Y ' + nf.format(res.rows.length - 8) + ' más.</p>' : '');
   }
+  if (res.warn && res.warn.length) h += res.warn.map(w => '<p class="imp-warn">' + esc(w) + '</p>').join('');
   box.innerHTML = h;
   const go = $('#imp-go');
   go.disabled = !res.rows.length; go.textContent = res.rows.length ? 'Importar ' + nf.format(res.rows.length) : 'Importar';
@@ -1539,7 +1674,23 @@ $('#app').addEventListener('click', e => {
   else if (a === 'cleardemo') { const ids = Store.all().filter(x => x.demo).map(x => x.id); const rem = Store.remove(ids); toast('Borré ' + rem.length + ' movimientos de ejemplo.', () => Store.addMany(rem)); }
   else if (a === 'import') togglePanel(true);
   else if (a === 'csv') exportCSV();
-  else if (a === 'backup') { download('my-money-respaldo-' + todayISO() + '.json', JSON.stringify(Store.dump(), null, 1), 'application/json'); }
+  else if (a === 'backup') { download('my-money-respaldo-' + todayISO() + '.json', JSON.stringify(Store.dump(), null, 1), 'application/json').then(() => { lsSet('mymoney.backup', String(Date.now())); render(); }); }
+  else if (a === 'snoozebk') { lsSet('mymoney.bksnooze', String(Date.now() + 7 * 864e5)); render(); }
+  else if (a === 'pasteimp') {
+    const box = $('#pasteTxt'), txt = box ? box.value : '';
+    const rows = txt.trim() ? readCsv(txt.replace(/^\s*\n/, '')) : [];
+    if (rows.length < 2) { toast('Pega primero las filas copiadas de Excel.'); return; }
+    impInit({ kind: 'paste', sheets: [{ name: 'Pegado', rows: rows }] }, 'Texto pegado'); render();
+  }
+  else if (a === 'update') {
+    toast('Buscando actualización…', null, null, 3000);
+    const done = () => location.reload();
+    (async () => {
+      try { const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r => r.unregister())); } catch (e) {}
+      try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch (e) {}
+      done();
+    })();
+  }
   else if (a === 'install' && deferredPrompt) { deferredPrompt.prompt(); deferredPrompt.userChoice.finally(() => { deferredPrompt = null; render(); }); }
   else if (a === 'wipe') {
     if (!wipeArmed) { wipeArmed = true; act.textContent = 'Toca de nuevo para borrar todo'; setTimeout(() => { wipeArmed = false; if (act.isConnected) act.textContent = 'Borrar todo'; }, 5000); }
@@ -1670,7 +1821,22 @@ Store.sub(render);
 Store.sub(drawMrow);
 render();
 Store.init();
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {})); }
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  const hadCtl = !!navigator.serviceWorker.controller; let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadCtl || reloading) return;
+    const a = document.activeElement, busy = S.imp || (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.value);
+    if (busy) { toast('Hay una versión nueva de My Money.', () => { reloading = true; location.reload(); }, 'Actualizar', 15000); return; }
+    reloading = true; location.reload();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(reg => {
+      reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+      setInterval(() => reg.update().catch(() => {}), 3600e3);
+    }).catch(() => {});
+  });
+}
 })();
 </script>
 </body>
