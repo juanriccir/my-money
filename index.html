@@ -329,6 +329,25 @@ table.mini th, table.mini td { padding: 5px 8px; max-width: 180px; overflow: hid
 details.paste{margin-top:14px;border-top:1px solid var(--line,#2a2a2e);padding-top:12px}
 details.paste summary{cursor:pointer;color:var(--gold,#c9a24a);font-size:.9rem}
 details.paste textarea{width:100%;margin-top:10px;background:#0a0a0b;color:inherit;border:1px solid #2a2a2e;border-radius:10px;padding:10px;font:inherit;font-size:.85rem;resize:vertical}
+.tab{letter-spacing:.03em;padding:12px 3px;font-size:.6rem}
+.invf{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.invf summary{cursor:pointer;color:var(--gold);font-size:.9rem;letter-spacing:.04em}
+.invf form{margin-top:12px;display:grid;gap:12px}
+.imp-f input[type="text"],.imp-f input[type="date"]{width:100%;height:40px;font-size:.9rem;letter-spacing:0;text-transform:none;font-weight:400;font-family:inherit}
+.pos-rows{display:grid;gap:8px}
+.pos-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) auto;gap:8px;align-items:center}
+.pos-row input{height:40px;min-width:0;border:1px solid var(--line);background:#0e0e10;color:var(--ink);border-radius:10px;padding:0 12px;font-size:.9rem}
+.split{display:flex;gap:2px;height:14px;border-radius:7px;overflow:hidden;margin:12px 0 10px}
+.split i{display:block;height:100%}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:8px;vertical-align:middle;flex:none}
+.comp{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:10px}
+.comp li{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:4px 12px;align-items:center;font-size:.9rem}
+.comp .nm{display:flex;align-items:center;min-width:0;overflow-wrap:anywhere}
+.comp select{border:0;background:#211f1a;color:var(--ink2);border-radius:6px;padding:2px 6px;font-size:.76rem;margin-left:8px}
+.comp .pc{color:var(--muted);font-size:.8rem;min-width:3.2rem;text-align:right}
+.pcell{white-space:normal;min-width:190px;text-align:left!important;font-size:.78rem;color:var(--ink2)}
+.donut{display:flex;justify-content:center}
+.note{color:var(--muted);font-size:.82rem;margin:10px 0 0}
 </style>
 </head>
 <body>
@@ -361,6 +380,7 @@ details.paste textarea{width:100%;margin-top:10px;background:#0a0a0b;color:inher
     <button class="tab" role="tab" data-tab="resumen" aria-selected="true">Resumen</button>
     <button class="tab" role="tab" data-tab="diario" aria-selected="false">Diario</button>
     <button class="tab" role="tab" data-tab="presupuestos" aria-selected="false">Presupuestos</button>
+    <button class="tab" role="tab" data-tab="inversiones" aria-selected="false">Inversiones</button>
     <button class="tab" role="tab" data-tab="ajustes" aria-selected="false">Ajustes</button>
   </nav>
 
@@ -599,18 +619,53 @@ function parseBulk(text) {
 /* ───────────── almacenamiento (solo en este dispositivo) ───────────── */
 const Store = (function () {
   let months = {}, budgets = {}, ready = false, seq = 0;
+  let inv = { sav: [], snaps: [], kinds: {} };
   const listeners = [];
   const LS = 'mymoney.v1';
   const emit = () => listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } });
   const newId = () => Date.now().toString(36) + (seq++).toString(36) + Math.random().toString(36).slice(2, 5);
+  const okD = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d));
+  function normInv(o) {
+    const r = { sav: [], snaps: [], kinds: {} };
+    if (!o || typeof o !== 'object') return r;
+    (Array.isArray(o.sav) ? o.sav : []).forEach(x => { if (x && okD(x.d) && x.acc && Number(x.a) > 0) r.sav.push({ id: x.id || newId(), d: x.d, acc: String(x.acc).slice(0, 40), a: Number(x.a) }); });
+    (Array.isArray(o.snaps) ? o.snaps : []).forEach(x => {
+      if (!x || !okD(x.d) || !(Number(x.trm) > 0)) return;
+      const pos = {}; Object.keys(x.pos || {}).forEach(k => { const v = Number(x.pos[k]); if (v > 0) pos[String(k).slice(0, 40)] = v; });
+      const u = Number(x.usd) > 0 ? Number(x.usd) : 0;
+      if (!Object.keys(pos).length && !u) return;
+      const it = { id: x.id || newId(), d: x.d, trm: Number(x.trm), pos: pos }; if (u) it.usd = u; r.snaps.push(it);
+    });
+    if (o.kinds && typeof o.kinds === 'object') Object.keys(o.kinds).forEach(k => { if (o.kinds[k] === 'ETF' || o.kinds[k] === 'Acción') r.kinds[k] = o.kinds[k]; });
+    return r;
+  }
+  function invAdd(type, list) {
+    const ids = [];
+    list.forEach(x => {
+      const it = Object.assign({}, x); if (!it.id) it.id = newId(); ids.push(it.id);
+      if (type === 'sav') inv.sav.push(it); else { inv.snaps = inv.snaps.filter(s => s.d !== it.d); inv.snaps.push(it); }
+    });
+    emit(); save(); return ids;
+  }
+  function invRemove(ids) {
+    const set = new Set(ids), out = { sav: [], snaps: [] };
+    inv.sav = inv.sav.filter(x => { if (set.has(x.id)) { out.sav.push(x); return false; } return true; });
+    inv.snaps = inv.snaps.filter(x => { if (set.has(x.id)) { out.snaps.push(x); return false; } return true; });
+    emit(); save(); return out;
+  }
+  function invRestore(r) {
+    (r.sav || []).forEach(x => inv.sav.push(x)); (r.snaps || []).forEach(x => { inv.snaps = inv.snaps.filter(s => s.d !== x.d); inv.snaps.push(x); });
+    emit(); save();
+  }
+  function invKind(tk, kind) { inv.kinds = Object.assign({}, inv.kinds); inv.kinds[tk] = kind; emit(); save(); }
   function save() {
-    try { localStorage.setItem(LS, JSON.stringify({ v: 2, months: months, budgets: budgets, cfg: CFG })); }
+    try { localStorage.setItem(LS, JSON.stringify({ v: 2, months: months, budgets: budgets, cfg: CFG, inv: inv })); }
     catch (e) { toast('No pude guardar en este dispositivo. Descarga un respaldo desde la pestaña Ajustes.'); }
   }
   function init() {
     let o = {};
     try { o = JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch (e) { o = {}; }
-    months = o.months || {}; budgets = o.budgets || {};
+    months = o.months || {}; budgets = o.budgets || {}; inv = normInv(o.inv);
     applyCfg(normCfg(o.cfg));
     ready = true; emit();
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
@@ -709,7 +764,7 @@ const Store = (function () {
     return u;
   }
 
-  function dump() { return { v: 2, exportado: new Date().toISOString(), months: months, budgets: budgets, cfg: CFG }; }
+  function dump() { return { v: 2, exportado: new Date().toISOString(), months: months, budgets: budgets, cfg: CFG, inv: inv }; }
   function restore(o) {
     if (!o || typeof o.months !== 'object' || !o.months) throw new Error('formato');
     if (o.cfg) {
@@ -728,13 +783,20 @@ const Store = (function () {
       });
     });
     if (o.budgets && typeof o.budgets === 'object') budgets = Object.assign({}, budgets, o.budgets);
+    if (o.inv) {
+      const inc = normInv(o.inv), ids = new Set(inv.sav.map(x => x.id).concat(inv.snaps.map(x => x.id)));
+      inc.sav.forEach(x => { if (!ids.has(x.id)) { inv.sav.push(x); added++; } });
+      inc.snaps.forEach(x => { if (!ids.has(x.id) && !inv.snaps.some(y => y.d === x.d)) { inv.snaps.push(x); added++; } });
+      inv.kinds = Object.assign({}, inc.kinds, inv.kinds);
+    }
     emit(); save(); return added;
   }
-  function clearAll() { months = {}; budgets = {}; applyCfg(cloneCfg(DEFAULT_CFG)); emit(); save(); }
+  function clearAll() { months = {}; budgets = {}; inv = { sav: [], snaps: [], kinds: {} }; applyCfg(cloneCfg(DEFAULT_CFG)); emit(); save(); }
   return {
     init: init, addMany: addMany, remove: remove, patch: patch, setBudget: setBudget, setBudgets: setBudgets,
     cfgAdd: cfgAdd, cfgRename: cfgRename, cfgKw: cfgKw, cfgDelete: cfgDelete, ensure: ensure, cfgCommit: cfgCommit, usage: usage, newId: newId,
     dump: dump, restore: restore, clearAll: clearAll,
+    inv: () => inv, invAdd: invAdd, invRemove: invRemove, invRestore: invRestore, invKind: invKind,
     sub: f => listeners.push(f),
     ready: () => ready,
     budgets: () => budgets,
@@ -744,7 +806,7 @@ const Store = (function () {
 })();
 
 /* ───────────── estado y cálculos ───────────── */
-const S = { month: todayISO().slice(0, 7), tab: 'resumen', q: '', type: 'all', med: 'all', medio: null, open: [], imp: null };
+const S = { month: todayISO().slice(0, 7), tab: 'resumen', q: '', type: 'all', med: 'all', medio: null, open: [], imp: null, invCur: 'cop' };
 const txOf = k => Store.month(k).slice().sort((a, b) => b.d.localeCompare(a.d) || String(b.id).localeCompare(String(a.id)));
 const sum = (arr, t) => arr.reduce((s, x) => s + (x.t === t ? x.a : 0), 0);
 function catTotals(items) {
@@ -896,7 +958,7 @@ function emptyHTML() {
     '<p>Escribe abajo como en WhatsApp: <code>almuerzo 25k</code>, <code>+sueldo 3.8M</code> o <code>ayer taxi 12000</code>. Yo detecto el monto, la categoría y si es gasto o ingreso.</p>' +
     '<div class="empty-actions"><button class="btn primary" data-act="demo">Cargar datos de ejemplo</button><button class="btn" data-act="import">Pegar chat de WhatsApp</button></div></section>';
 }
-const APP_VERSION = '4';
+const APP_VERSION = '5';
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 function backupDue() {
@@ -1042,7 +1104,7 @@ function viewAjustes() {
   const kwHelp = ' Las palabras clave hacen que el chat y la importación la reconozcan solos, por ejemplo "arriendo, alquiler". El nombre también cuenta como palabra clave.';
   return '<div class="grid">' +
     '<section class="card span2"><h2>Importar historial</h2><p class="set-p">Sube tu Excel (.xlsx), un CSV o un PDF de extracto. Antes de guardar te muestro qué entendí, y puedes deshacer la importación.</p>' +
-    '<div class="set-actions"><label class="btn primary" for="impFile">Elegir archivo</label><input id="impFile" type="file" accept=".xlsx,.xlsm,.csv,.tsv,.txt,.pdf,application/pdf" hidden><button class="btn" data-act="import">Pegar mensajes de WhatsApp</button></div>' +
+    '<div class="set-actions"><label class="btn primary" for="impFile">Elegir archivo</label><input id="impFile" type="file" hidden><button class="btn" data-act="import">Pegar mensajes de WhatsApp</button></div>' +
     '<details class="paste"><summary>¿No te lee bien el archivo? Pega tus filas desde Excel</summary><p class="set-p">En Excel selecciona las filas (con el encabezado si lo tienes), copia y pega aquí. Luego te dejo elegir qué columna es cada cosa.</p><textarea id="pasteTxt" rows="5" placeholder="Pega aquí…" aria-label="Filas copiadas de Excel"></textarea><div class="set-actions"><button class="btn primary" data-act="pasteimp">Leer lo pegado</button></div></details></section>' +
     cfgCard('out', 'Categorías de gastos', 'Cambia el nombre, borra las que no uses o crea las tuyas.' + kwHelp, 'Ej. Suscripciones') +
     cfgCard('in', 'Fuentes de ingreso', 'Crea una por cada persona o empresa que te da plata, por ejemplo Papá.' + kwHelp, 'Ej. Papá') +
@@ -1352,7 +1414,7 @@ function blockDate(v, sm, sy) {
 }
 function impComputeBlocks(st) {
   const planned = { out: {}, in: {}, med: {} }, newNames = { out: [], in: [], med: [] };
-  const ign = { nodate: 0, noamt: 0, skip: 0 }, warn = [];
+  const ign = { nodate: 0, noamt: 0, skip: 0 }, warn = []; let needYear = false;
   const plan = (kind, list, raw) => {
     const hit = findByName(list, raw) || bestMatch(list, strip(raw));
     if (hit) return hit.name;
@@ -1363,7 +1425,8 @@ function impComputeBlocks(st) {
   };
   let out = [];
   st.sheets.forEach((sh, si) => {
-    const ym = sheetYM(sh.name);
+    const ym0 = sheetYM(sh.name), fn = sheetYM(st.name), ym = { m: ym0.m || fn.m || st.fixM || null, y: ym0.y || fn.y || st.year || null };
+    if (!ym.y && st.blocks.per[si].length) needYear = true;
     st.blocks.per[si].forEach(b => {
       let sum = 0, tot = null;
       for (let ri = b.r + 1; ri < sh.rows.length; ri++) {
@@ -1391,6 +1454,7 @@ function impComputeBlocks(st) {
       if (tot != null && tot !== sum) warn.push('En "' + sh.name + '" los ' + (b.t === 'in' ? 'ingresos' : 'egresos') + ' suman ' + money(sum) + ' pero el total del Excel dice ' + money(tot) + '.');
     });
   });
+  if (needYear) out = [];
   let dup = 0;
   if (st.dup) {
     const have = {}, key = x => x.d + '|' + x.t + '|' + x.a + '|' + normKey(x.n).slice(0, 40);
@@ -1399,7 +1463,8 @@ function impComputeBlocks(st) {
   }
   let min = '9999', max = '0000', nOut = 0, nIn = 0, sOut = 0, sIn = 0;
   out.forEach(x => { if (x.d < min) min = x.d; if (x.d > max) max = x.d; if (x.t === 'in') { nIn++; sIn += x.a; } else { nOut++; sOut += x.a; } });
-  return { rows: out, dup: dup, ign: ign, warn: warn, newNames: newNames, min: min, max: max, nOut: nOut, nIn: nIn, sOut: sOut, sIn: sIn };
+  const iv = ivPlan(st); iv.warn.forEach(w => warn.push(w));
+  return { rows: out, iv: iv, needYear: needYear, dup: dup, ign: ign, warn: warn, newNames: newNames, min: min, max: max, nOut: nOut, nIn: nIn, sOut: sOut, sIn: sIn };
 }
 
 /* convertir filas del archivo en movimientos */
@@ -1476,7 +1541,8 @@ const fmtD = iso => iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(2
 function impInit(res, name) {
   const st = { name: name, kind: res.kind, sheets: res.sheets, sel: 0, hdr: 0, map: null, rule: 'auto', dmy: 'dmy', dup: true, create: true, parsed: null };
   const bl = detectBlocks(res.sheets);
-  if (bl.n >= 2) { st.blocks = bl; S.imp = st; return; }
+  st.iv = detectInv(res.sheets);
+  if (bl.n >= 1 || st.iv) { st.blocks = bl.n >= 1 ? bl : { n: 0, per: res.sheets.map(() => []) }; S.imp = st; return; }
   if (st.sheets.length > 1) {
     const sig = sh => { const h = guessHeader(sh.rows); return h + '|' + (h > 0 ? (sh.rows[h - 1] || []).map(normKey).join(',') : ''); };
     const s0 = sig(st.sheets[0]);
@@ -1490,9 +1556,17 @@ function impHTML() {
   const st = S.imp;
   if (st.loading) return '<p class="none">Leyendo ' + esc(st.loading) + '…</p>';
   if (st.blocks) {
-    const used = st.sheets.filter((x, i) => st.blocks.per[i].length).map(x => x.name);
+    const used = st.sheets.filter((x, i) => st.blocks.per[i].length).map(x => x.name), fnYM = sheetYM(st.name);
+    const needY = st.sheets.some((x, i) => st.blocks.per[i].length && !(sheetYM(x.name).y || fnYM.y));
+    const needM = st.sheets.some((x, i) => st.blocks.per[i].length && !(sheetYM(x.name).m || fnYM.m));
+    const intro = st.blocks.n
+      ? 'Reconocí tus tablas de <b>Ingresos</b> y <b>Egresos</b> en ' + used.length + (used.length === 1 ? ' hoja' : ' hojas') + ' (' + esc(used.slice(0, 4).join(', ')) + (used.length > 4 ? '…' : '') + '). El año lo tomo del nombre de cada pestaña, por ejemplo "Agosto 25" es agosto de 2025.'
+      : 'Encontré tus tablas de <b>ahorros</b> e <b>inversión</b>.';
+    const yr = needY ? '<label class="imp-f"><span>¿De qué año es este archivo?</span><select id="imp-year"><option value="">Elige el año…</option>' + [2023, 2024, 2025, 2026, 2027].map(y => '<option value="' + y + '"' + (st.year === y ? ' selected' : '') + '>' + y + '</option>').join('') + '</select></label>' : '';
+    const mo = needM ? '<label class="imp-f"><span>Mes (si las fechas solo traen el día)</span><select id="imp-fixm"><option value="">Según cada fecha</option>' + MESES.map((m, i) => '<option value="' + (i + 1) + '"' + (st.fixM === i + 1 ? ' selected' : '') + '>' + m.charAt(0).toUpperCase() + m.slice(1) + '</option>').join('') + '</select></label>' : '';
     return '<section class="card imp" id="imp"><div class="imp-top"><h2>Importar historial</h2><span class="set-p" style="margin:0">' + esc(st.name) + '</span></div>' +
-      '<p class="set-p">Reconocí tus tablas de <b>Ingresos</b> y <b>Egresos</b> en ' + used.length + (used.length === 1 ? ' hoja' : ' hojas') + ' (' + esc(used.slice(0, 4).join(', ')) + (used.length > 4 ? '…' : '') + '). El año lo tomo del nombre de cada pestaña, por ejemplo "Agosto 25" es agosto de 2025. Revisa el resumen y confirma.</p>' +
+      '<p class="set-p">' + intro + (needY ? ' Este archivo no dice a qué año pertenece, indícalo abajo.' : '') + ' Revisa el resumen y confirma.</p>' +
+      (yr || mo ? '<div class="imp-grid">' + yr + mo + '</div>' : '') +
       '<label class="imp-chk"><input id="imp-dup" type="checkbox"' + (st.dup ? ' checked' : '') + '>Omitir los que ya tengo (misma fecha, monto y descripción)</label>' +
       '<label class="imp-chk"><input id="imp-create" type="checkbox"' + (st.create ? ' checked' : '') + '>Crear las fuentes de ingreso y medios nuevos que vengan en el archivo</label>' +
       '<div id="impPrev"></div>' +
@@ -1527,12 +1601,13 @@ function impPreview() {
   const st = S.imp, box = $('#impPrev'); if (!box) return;
   const res = impCompute(st); st.parsed = res;
   const today = todayISO();
+  const ivN = res.iv ? res.iv.sav.length + res.iv.snaps.length : 0;
   let h = '';
-  if (!res.rows.length) {
+  if (!res.rows.length && !ivN) {
     h += '<p class="imp-sum">No hay movimientos para importar con esta configuración.' + (res.dup ? ' ' + res.dup + ' ya estaban guardados.' : '') + '</p>';
     if (res.ign.nodate) h += '<p class="imp-warn">No pude leer la fecha en ' + res.ign.nodate + ' filas. Revisa la fila de encabezados y la columna de fecha.</p>';
     if (res.ign.noamt) h += '<p class="imp-warn">' + res.ign.noamt + ' filas no tienen un monto que pueda leer. Revisa la columna de monto y cómo saber si es gasto o ingreso.</p>';
-  } else {
+  } else if (res.rows.length) {
     h += '<p class="imp-sum">Encontré <b>' + nf.format(res.rows.length) + '</b> movimientos: ' + res.nOut + ' gastos por <b>' + money(res.sOut) + '</b> y ' + res.nIn + ' ingresos por <b>' + money(res.sIn) + '</b>, del ' + fmtD(res.min) + ' al ' + fmtD(res.max) + '.</p>';
     if (res.dup) h += '<p class="imp-sum">' + res.dup + ' ya los tenías y los omito.</p>';
     const ig = res.ign.nodate + res.ign.noamt + res.ign.skip;
@@ -1547,10 +1622,16 @@ function impPreview() {
       res.rows.slice(0, 8).map(x => '<tr><td>' + fmtD(x.d) + '</td><td>' + esc(x.n) + '</td><td>' + esc(x.c) + '</td><td>' + esc(x.m || '—') + '</td><td class="mono ' + x.t + '">' + (x.t === 'in' ? '+' : '−') + money(x.a) + '</td></tr>').join('') + '</tbody></table></div>' +
       (res.rows.length > 8 ? '<p class="set-p" style="margin:6px 0 0">Y ' + nf.format(res.rows.length - 8) + ' más.</p>' : '');
   }
+  if (res.needYear) h += '<p class="imp-warn">Elige el año de este archivo para continuar.</p>';
+  if (ivN) {
+    const accs = Array.from(new Set(res.iv.sav.map(x => x.acc))), tks = Array.from(new Set([].concat.apply([], res.iv.snaps.map(x => Object.keys(x.pos)))));
+    h += '<p class="imp-sum">En Inversiones: <b>' + res.iv.sav.length + '</b> saldos de ahorro' + (accs.length ? ' (' + esc(accs.join(', ')) + ')' : '') + ' y <b>' + res.iv.snaps.length + '</b> registros de portafolio' + (tks.length ? ' (' + esc(tks.join(', ')) + ')' : '') + '.</p>';
+  }
   if (res.warn && res.warn.length) h += res.warn.map(w => '<p class="imp-warn">' + esc(w) + '</p>').join('');
   box.innerHTML = h;
   const go = $('#imp-go');
-  go.disabled = !res.rows.length; go.textContent = res.rows.length ? 'Importar ' + nf.format(res.rows.length) : 'Importar';
+  const tot = res.rows.length + ivN;
+  go.disabled = !tot; go.textContent = tot ? 'Importar ' + nf.format(tot) : 'Importar';
 }
 function impPick(input) {
   const f = input.files && input.files[0]; if (!f) return;
@@ -1563,21 +1644,26 @@ function impChange(t) {
   if (t.id === 'imp-sheet') { st.sel = t.value === 'all' ? 'all' : Number(t.value); const sh = impSheet(st); st.hdr = guessHeader(sh.rows); st.map = guessMap(sh.rows, st.hdr); render(); return; }
   if (t.id === 'imp-hdr') { st.hdr = Math.max(0, Math.min(200, Math.floor(Number(t.value) || 0))); st.map = guessMap(impSheet(st).rows, st.hdr); render(); return; }
   if (t.dataset && t.dataset.f) { st.map[t.dataset.f] = Number(t.value); impPreview(); return; }
-  if (t.id === 'imp-rule') st.rule = t.value; else if (t.id === 'imp-dmy') st.dmy = t.value; else if (t.id === 'imp-dup') st.dup = t.checked; else if (t.id === 'imp-create') st.create = t.checked;
+  if (t.id === 'imp-rule') st.rule = t.value; else if (t.id === 'imp-dmy') st.dmy = t.value; else if (t.id === 'imp-dup') st.dup = t.checked; else if (t.id === 'imp-create') st.create = t.checked; else if (t.id === 'imp-year') st.year = Number(t.value) || null; else if (t.id === 'imp-fixm') st.fixM = Number(t.value) || null;
   impPreview();
 }
 function impCommit() {
   const st = S.imp, res = st && st.parsed;
-  if (!res || !res.rows.length) return;
+  if (!res) return;
+  const iv = res.iv || { sav: [], snaps: [] }, ivN = iv.sav.length + iv.snaps.length;
+  if (!res.rows.length && !ivN) return;
   const rows = res.rows.map(x => { const y = Object.assign({}, x); y.c = Store.ensure(y.t, y.c); if (y.m) y.m = Store.ensure('med', y.m); y.id = Store.newId(); return y; });
   Store.cfgCommit(true);
   const ids = rows.map(x => x.id);
   let latest = rows.reduce((a, x) => (x.d > a ? x.d : a), '0000');
   const today = todayISO();
   if (latest > today) { const past = rows.filter(x => x.d <= today).reduce((a, x) => (x.d > a ? x.d : a), '0000'); if (past !== '0000') latest = past; }
-  S.imp = null; S.tab = 'resumen'; S.month = latest.slice(0, 7);
-  Store.addMany(rows);
-  toast('Importé ' + nf.format(rows.length) + ' movimientos.', () => { Store.remove(ids); });
+  S.imp = null;
+  if (rows.length) { S.tab = 'resumen'; S.month = latest.slice(0, 7); } else S.tab = 'inversiones';
+  const ivIds = ivN ? Store.invAdd('sav', iv.sav).concat(Store.invAdd('snap', iv.snaps)) : [];
+  if (rows.length) Store.addMany(rows);
+  const msg = (rows.length ? 'Importé ' + nf.format(rows.length) + ' movimientos' : 'Importé') + (ivN ? (rows.length ? ' y ' : ' ') + iv.sav.length + ' saldos de ahorro y ' + iv.snaps.length + ' registros de portafolio' : '') + '.';
+  toast(msg, () => { if (ids.length) Store.remove(ids); if (ivIds.length) Store.invRemove(ivIds); });
 }
 
 function download(name, text, type) {
@@ -1609,9 +1695,280 @@ function render() {
   const v = $('#view');
   if (!Store.ready()) { v.innerHTML = '<p class="none">Cargando tus movimientos…</p>'; return; }
   if (S.imp) { v.innerHTML = impHTML(); if (!S.imp.loading) impPreview(); return; }
-  v.innerHTML = S.tab === 'resumen' ? viewResumen() : S.tab === 'diario' ? viewDiario() : S.tab === 'presupuestos' ? viewPresu() : viewAjustes();
+  document.querySelector('.month').style.visibility = S.tab === 'inversiones' ? 'hidden' : '';
+  v.innerHTML = S.tab === 'resumen' ? viewResumen() : S.tab === 'diario' ? viewDiario() : S.tab === 'presupuestos' ? viewPresu() : S.tab === 'inversiones' ? viewInversiones() : viewAjustes();
+  if (S.tab === 'inversiones') drawInv();
   if (S.tab === 'resumen') drawCharts();
   if (S.tab === 'diario') paintDiary();
+}
+
+/* ───────────── inversiones ───────────── */
+const INV_PAL = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#9085e9'];
+const KIND_COL = { 'ETF': '#c98500', 'Acción': '#3987e5' };
+const guessKind = tk => (/s&p|sp ?500|\betf\b|vti|voo|spy|qqq|nasdaq|msci|vanguard|ishares|indice|índice|fondo|bonos?\b/i.test(tk) ? 'ETF' : 'Acción');
+const kindOf = tk => Store.inv().kinds[tk] || guessKind(tk);
+const usdF = new Intl.NumberFormat('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const usd = n => 'US$ ' + usdF.format(n);
+const longD = iso => Number(iso.slice(8, 10)) + ' ' + MESES_C[Number(iso.slice(5, 7)) - 1] + ' ' + iso.slice(0, 4);
+const pct = n => (n >= 0 ? '+' : '−') + Math.abs(n * 100).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%';
+function parseAmt(x) {
+  const t = strip(String(x || '')).trim().replace(/\s+/g, ' ');
+  const m = t.match(/^(.*?)\s*(millones|millon|mm|m|mil|k)?$/);
+  let n = parseMoney(m ? m[1] : t); if (!isFinite(n)) return NaN;
+  if (m && m[2]) n *= /^(k|mil)$/.test(m[2]) ? 1e3 : 1e6;
+  return n;
+}
+function savSeries() {
+  const rows = Store.inv().sav.slice().sort((a, b) => a.d.localeCompare(b.d)), last = {}, out = [];
+  Array.from(new Set(rows.map(r => r.d))).forEach(d => {
+    rows.filter(r => r.d === d).forEach(r => { last[r.acc] = r.a; });
+    const parts = Object.assign({}, last);
+    out.push({ d: d, v: Object.keys(parts).reduce((a, k) => a + parts[k], 0), parts: parts });
+  });
+  return out;
+}
+function snapList() {
+  return Store.inv().snaps.slice().sort((a, b) => a.d.localeCompare(b.d)).map(sn => {
+    const pos = sn.pos || {}; let u = Object.keys(pos).reduce((a, k) => a + pos[k], 0); if (!u && sn.usd) u = sn.usd;
+    return { id: sn.id, d: sn.d, trm: sn.trm, pos: pos, usd: u, cop: u * sn.trm };
+  });
+}
+function tickerOrder() {
+  const o = []; snapList().forEach(sn => Object.keys(sn.pos).forEach(k => { if (o.indexOf(k) < 0) o.push(k); }));
+  return o;
+}
+const tkColor = tk => { const i = tickerOrder().indexOf(tk); return i >= 0 && i < INV_PAL.length ? INV_PAL[i] : '#8f8878'; };
+
+function drawTS(el, pts, o) {
+  if (!el) return;
+  if (!pts.length) { el.innerHTML = '<p class="none">Aún no hay registros.</p>'; return; }
+  const w = Math.max(260, el.clientWidth), h = w < 480 ? 210 : 250, L = 52, R = 18, T = 18, Bt = 28, n = pts.length;
+  const t0 = pts[0].t, t1 = pts[n - 1].t, span = Math.max(1, t1 - t0);
+  const ymax = niceMax(Math.max(1, ...pts.map(p => p.v)));
+  const X = t => (n === 1 ? L + (w - L - R) / 2 : L + (w - L - R) * (t - t0) / span);
+  const Y = v => T + (h - T - Bt) * (1 - v / ymax);
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = ymax * i / 4, y = Y(v);
+    g += '<line x1="' + L + '" x2="' + (w - R) + '" y1="' + y + '" y2="' + y + '" stroke="' + (i === 0 ? 'var(--axis)' : 'var(--line)') + '"/>';
+    g += '<text x="' + (L - 8) + '" y="' + (y + 4) + '" text-anchor="end">' + (v === 0 ? '0' : o.axis(v)) + '</text>';
+  }
+  const idx = (n <= 4 ? pts.map((_, i) => i) : [0, Math.round((n - 1) / 3), Math.round(2 * (n - 1) / 3), n - 1]).filter((v, i, a) => a.indexOf(v) === i);
+  idx.forEach(i => {
+    const p = pts[i], anc = i === 0 && n > 1 ? 'start' : i === n - 1 && n > 1 ? 'end' : 'middle';
+    g += '<text x="' + (anc === 'start' ? L : anc === 'end' ? w - R : X(p.t)) + '" y="' + (h - 6) + '" text-anchor="' + anc + '">' + MESES_C[Number(p.d.slice(5, 7)) - 1] + ' ' + p.d.slice(2, 4) + '</text>';
+  });
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + X(p.t).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join('');
+  if (n > 1) g += '<path d="' + line + 'L' + X(t1).toFixed(1) + ' ' + Y(0) + 'L' + X(t0).toFixed(1) + ' ' + Y(0) + 'Z" fill="' + o.color + '" opacity="0.12"/>';
+  g += '<path d="' + line + '" fill="none" stroke="' + o.color + '" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>';
+  if (n <= 30) pts.forEach(p => { g += '<circle cx="' + X(p.t).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="3.5" fill="' + o.color + '" stroke="var(--surface)" stroke-width="2"/>'; });
+  const lp = pts[n - 1];
+  g += '<circle cx="' + X(lp.t).toFixed(1) + '" cy="' + Y(lp.v).toFixed(1) + '" r="5" fill="' + o.color + '" stroke="var(--surface)" stroke-width="2"/>';
+  g += '<text class="val" x="' + (w - R) + '" y="' + (Math.max(T + 8, Y(lp.v) - 11)) + '" text-anchor="end">' + o.fmt(lp.v) + '</text>';
+  g += '<g class="hv" visibility="hidden"><line class="hl" y1="' + T + '" y2="' + (h - Bt) + '" stroke="var(--ink2)" stroke-width="1"/><circle class="hd" r="5" fill="' + o.color + '" stroke="var(--surface)" stroke-width="2"/></g>';
+  g += '<rect class="hit" x="' + L + '" y="' + T + '" width="' + (w - L - R) + '" height="' + (h - T - Bt) + '" fill="transparent"/>';
+  el.innerHTML = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="' + esc(o.label) + '">' + g + '</svg>';
+  const svg = el.firstChild, hv = svg.querySelector('.hv'), hl = svg.querySelector('.hl'), hd = svg.querySelector('.hd');
+  const move = e => {
+    const r = svg.getBoundingClientRect(), x = e.clientX - r.left;
+    let bi = 0, bd = 1e12; pts.forEach((p, i) => { const dd = Math.abs(X(p.t) - x); if (dd < bd) { bd = dd; bi = i; } });
+    const p = pts[bi];
+    hv.setAttribute('visibility', 'visible'); hl.setAttribute('x1', X(p.t)); hl.setAttribute('x2', X(p.t)); hd.setAttribute('cx', X(p.t)); hd.setAttribute('cy', Y(p.v));
+    showTip([longD(p.d)].concat(p.lines), e.clientX, e.clientY);
+  };
+  svg.addEventListener('pointermove', move); svg.addEventListener('pointerdown', move);
+  svg.addEventListener('pointerleave', () => { hv.setAttribute('visibility', 'hidden'); hideTip(); });
+}
+function drawDonut(el, parts, total, top, bottom) {
+  if (!el) return;
+  const size = Math.min(230, Math.max(180, el.clientWidth || 220)), c = size / 2, r1 = c - 4, r0 = r1 * 0.64;
+  const pol = (r, a) => [c + r * Math.sin(a), c - r * Math.cos(a)];
+  let a = 0, g = '';
+  parts.forEach(p => {
+    const f = p.v / total; if (!(f > 0)) return;
+    const tp = esc(p.k + '|' + usd(p.v) + ' · ' + (Math.round(f * 1000) / 10).toLocaleString('es-CO') + '%');
+    if (f >= 0.9999) { g += '<circle cx="' + c + '" cy="' + c + '" r="' + ((r0 + r1) / 2) + '" fill="none" stroke="' + p.c + '" stroke-width="' + (r1 - r0) + '" data-tip="' + tp + '"/>'; return; }
+    const a1 = a + f * 2 * Math.PI, A = pol(r1, a), B = pol(r1, a1), C = pol(r0, a1), D = pol(r0, a), lg = f > 0.5 ? 1 : 0;
+    g += '<path d="M' + A[0].toFixed(2) + ' ' + A[1].toFixed(2) + 'A' + r1 + ' ' + r1 + ' 0 ' + lg + ' 1 ' + B[0].toFixed(2) + ' ' + B[1].toFixed(2) + 'L' + C[0].toFixed(2) + ' ' + C[1].toFixed(2) + 'A' + r0 + ' ' + r0 + ' 0 ' + lg + ' 0 ' + D[0].toFixed(2) + ' ' + D[1].toFixed(2) + 'Z" fill="' + p.c + '" stroke="var(--surface)" stroke-width="2" data-tip="' + tp + '"/>';
+    a = a1;
+  });
+  g += '<text x="' + c + '" y="' + (c - 4) + '" text-anchor="middle">' + esc(top) + '</text><text x="' + c + '" y="' + (c + 16) + '" text-anchor="middle" style="font-size:15px;fill:var(--ink)">' + esc(bottom) + '</text>';
+  el.innerHTML = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '" role="img" aria-label="Repartición del portafolio">' + g + '</svg>';
+}
+function latestParts() {
+  const sn = snapList(), last = sn[sn.length - 1]; if (!last) return null;
+  const tot = last.usd, ks = Object.keys(last.pos).sort((a, b) => last.pos[b] - last.pos[a]);
+  return { last: last, total: tot, rows: ks.map(k => ({ k: k, v: last.pos[k], c: tkColor(k), kind: kindOf(k) })) };
+}
+function drawInv() {
+  const sav = savSeries(), sn = snapList(), cur = S.invCur;
+  drawTS($('#chSav'), sav.map(x => ({ t: Date.parse(x.d), d: x.d, v: x.v, lines: ['Total: ' + money(x.v)].concat(Object.keys(x.parts).length > 1 ? Object.keys(x.parts).map(k => k + ': ' + money(x.parts[k])) : []) })),
+    { color: 'var(--gold)', axis: short, fmt: money, label: 'Saldo total de ahorros a lo largo del tiempo' });
+  drawTS($('#chPf'), sn.map(x => ({ t: Date.parse(x.d), d: x.d, v: cur === 'usd' ? x.usd : x.cop, lines: [usd(x.usd), money(x.cop), 'TRM: ' + usdF.format(x.trm)] })),
+    { color: '#3987e5', axis: v => (cur === 'usd' ? (v >= 1000 ? short(v) : String(Math.round(v))) : short(v)), fmt: v => (cur === 'usd' ? usd(v) : money(v)), label: 'Valor del portafolio a lo largo del tiempo' });
+  const lp = latestParts();
+  if (lp) {
+    const top = lp.rows.slice(0, 6), rest = lp.rows.slice(6).reduce((a, r) => a + r.v, 0);
+    const parts = top.map(r => ({ k: r.k, v: r.v, c: r.c })); if (rest > 0) parts.push({ k: 'Otros', v: rest, c: '#8f8878' });
+    drawDonut($('#chDon'), parts, lp.total, 'Total', usd(lp.total));
+  }
+}
+function viewInversiones() {
+  const sav = savSeries(), sn = snapList(), invd = Store.inv();
+  const ls = sav[sav.length - 1], lp = sn[sn.length - 1], fs = sav[0], fp = sn[0];
+  const savNow = ls ? ls.v : 0, pfCop = lp ? lp.cop : 0, pfUsd = lp ? lp.usd : 0;
+  const empty = !ls && !lp;
+  const hero = empty ? '' : '<section class="hero"><p class="eyebrow">Ahorros e inversiones</p><p class="hero-num">' + money(savNow + pfCop) + '</p>' +
+    '<dl class="kpis"><div><dt>Ahorro alto rendimiento</dt><dd>' + (ls ? money(savNow) : '—') + '</dd><dd class="sub">' + (ls ? 'al ' + longD(ls.d) : 'sin registros') + '</dd></div>' +
+    '<div><dt>Portafolio</dt><dd>' + (lp ? money(pfCop) : '—') + '</dd><dd class="sub">' + (lp ? 'al ' + longD(lp.d) : 'sin registros') + '</dd></div>' +
+    '<div><dt>Portafolio en USD</dt><dd>' + (lp ? usd(pfUsd) : '—') + '</dd></div>' +
+    '<div><dt>TRM del último registro</dt><dd>' + (lp ? '$ ' + usdF.format(lp.trm) : '—') + '</dd></div></dl></section>';
+
+  /* ahorros */
+  let savFacts = '';
+  if (ls) {
+    const growth = ls.v - fs.v, days = (Date.parse(ls.d) - Date.parse(fs.d)) / 864e5, months = days / 30.44, prev = sav.length > 1 ? sav[sav.length - 2] : null;
+    savFacts = '<dl class="facts"><div><dt>Saldo actual</dt><dd>' + money(ls.v) + '</dd></div>' +
+      (sav.length > 1 ? '<div><dt>Crecimiento desde ' + longD(fs.d) + '</dt><dd>' + (growth < 0 ? '−' : '+') + money(Math.abs(growth)) + (fs.v > 0 ? ' (' + pct(growth / fs.v) + ')' : '') + '</dd></div>' +
+        '<div><dt>Último periodo</dt><dd>' + (ls.v - prev.v < 0 ? '−' : '+') + money(Math.abs(ls.v - prev.v)) + '</dd></div>' +
+        (months >= 1 ? '<div><dt>Promedio por mes</dt><dd>' + (growth < 0 ? '−' : '+') + money(Math.abs(growth / months)) + '</dd></div>' : '') : '') + '</dl>';
+  }
+  const accs = Array.from(new Set(invd.sav.map(x => x.acc)));
+  const lastAcc = invd.sav.length ? invd.sav[invd.sav.length - 1].acc : '';
+  const savRows = invd.sav.slice().sort((a, b) => b.d.localeCompare(a.d)).map(x => '<tr><td>' + longD(x.d) + '</td><td>' + esc(x.acc) + '</td><td class="mono">' + money(x.a) + '</td><td><button class="del" data-invdel="' + x.id + '" aria-label="Borrar registro">✕</button></td></tr>').join('');
+  const savForm = '<details class="invf"><summary>Registrar saldo de ahorro</summary><form class="inv-form" data-k="sav"><div class="imp-grid">' +
+    '<label class="imp-f"><span>Cuenta</span><input name="acc" type="text" list="accList" maxlength="40" value="' + esc(lastAcc) + '" placeholder="Ej. Nu Bank" required></label><datalist id="accList">' + accs.map(a => '<option value="' + esc(a) + '">').join('') + '</datalist>' +
+    '<label class="imp-f"><span>Fecha</span><input name="d" type="date" value="' + todayISO() + '" required></label>' +
+    '<label class="imp-f"><span>Saldo total a la fecha</span><input name="a" type="text" inputmode="decimal" placeholder="Ej. 24M o 23.882.583" required></label></div>' +
+    '<div class="set-actions"><button class="btn primary" type="submit">Guardar saldo</button></div></form></details>';
+  const savCard = '<section class="card span2"><div class="card-head"><h2>Ahorros en cuentas de alto rendimiento</h2></div><div class="chart" id="chSav"></div>' + savFacts +
+    (savRows ? '<details class="tbl"><summary>Ver los ' + invd.sav.length + ' registros</summary><div class="tscroll"><table class="mini"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Saldo</th><th></th></tr></thead><tbody>' + savRows + '</tbody></table></div></details>' : '') + savForm + '</section>';
+
+  /* portafolio */
+  let pfFacts = '';
+  if (lp) {
+    pfFacts = '<dl class="facts"><div><dt>Valor actual</dt><dd>' + usd(lp.usd) + '<br>' + money(lp.cop) + '</dd></div>' +
+      (sn.length > 1 && fp.usd > 0 ? '<div><dt>Desde ' + longD(fp.d) + '</dt><dd>En dólares ' + pct(lp.usd / fp.usd - 1) + '<br>En pesos ' + pct(lp.cop / fp.cop - 1) + '</dd></div>' +
+        '<div><dt>TRM</dt><dd>$ ' + usdF.format(fp.trm) + ' → $ ' + usdF.format(lp.trm) + '<br>Efecto dólar ' + pct(lp.trm / fp.trm - 1) + '</dd></div>' : '<div><dt>TRM</dt><dd>$ ' + usdF.format(lp.trm) + '</dd></div>') + '</dl>';
+  }
+  const tks = tickerOrder(), last = lp ? lp.pos : {};
+  const rowsHTML = (pre) => (tks.filter(k => pre ? last[k] != null : false).concat(pre ? [] : ['', ''])).map(k => '<div class="pos-row"><input name="tk" type="text" list="tkList" maxlength="40" placeholder="Ej. S&P 500" value="' + esc(k) + '"><input name="usd" type="text" inputmode="decimal" placeholder="USD" value="' + (k && last[k] != null ? String(last[k]) : '') + '"><button type="button" class="del" data-act="rmrow" aria-label="Quitar posición">✕</button></div>').join('');
+  const snapForm = '<details class="invf"><summary>Registrar portafolio</summary><form class="inv-form" data-k="snap"><p class="note" style="margin:0">Anota el valor en USD de cada posición en esa fecha y la TRM del día. Ya te dejé las de tu último registro para que solo cambies los valores.</p><div class="imp-grid">' +
+    '<label class="imp-f"><span>Fecha</span><input name="d" type="date" value="' + todayISO() + '" required></label>' +
+    '<label class="imp-f"><span>TRM de ese día</span><input name="trm" type="text" inputmode="decimal" placeholder="Ej. 3.192" value="' + (lp ? String(lp.trm) : '') + '" required></label></div>' +
+    '<div class="pos-rows" id="posRows">' + (lp ? rowsHTML(true) : rowsHTML(false)) + '</div><datalist id="tkList">' + tks.map(k => '<option value="' + esc(k) + '">').join('') + '</datalist>' +
+    '<div class="set-actions"><button type="button" class="btn" data-act="invrow">+ Posición</button><button class="btn primary" type="submit">Guardar registro</button></div></form></details>';
+  const snapRows = sn.slice().reverse().map(x => '<tr><td>' + longD(x.d) + '</td><td class="mono">' + usdF.format(x.trm) + '</td><td class="mono">' + usd(x.usd) + '</td><td class="mono">' + money(x.cop) + '</td><td class="pcell">' + esc(Object.keys(x.pos).map(k => k + ' ' + usdF.format(x.pos[k])).join(' · ')) + '</td><td><button class="del" data-invdel="' + x.id + '" aria-label="Borrar registro">✕</button></td></tr>').join('');
+  const pfCard = '<section class="card span2"><div class="card-head"><h2>Portafolio en dólares</h2><div class="seg" role="group" aria-label="Moneda"><button type="button" data-invcur="cop" aria-pressed="' + (S.invCur === 'cop') + '">Pesos</button><button type="button" data-invcur="usd" aria-pressed="' + (S.invCur === 'usd') + '">Dólares</button></div></div>' +
+    '<div class="chart" id="chPf"></div>' + pfFacts + (lp ? '<p class="note">Cada registro es el valor total de tu portafolio en esa fecha, convertido con la TRM de ese día. Si en el periodo compraste más, el cambio incluye tus aportes y la valorización.</p>' : '') +
+    (snapRows ? '<details class="tbl"><summary>Ver los ' + sn.length + ' registros</summary><div class="tscroll"><table class="mini"><thead><tr><th>Fecha</th><th>TRM</th><th>USD</th><th>COP</th><th>Posiciones</th><th></th></tr></thead><tbody>' + snapRows + '</tbody></table></div></details>' : '') + snapForm + '</section>';
+
+  /* repartición */
+  let compCard = '';
+  const lpp = latestParts();
+  if (lpp) {
+    const byKind = { 'ETF': 0, 'Acción': 0 }; lpp.rows.forEach(r => { byKind[r.kind] += r.v; });
+    const ks = ['ETF', 'Acción'].filter(k => byKind[k] > 0);
+    compCard = '<section class="card"><div class="card-head"><h2>Repartición por posición</h2></div><div class="chart donut" id="chDon"></div><ul class="comp">' +
+      lpp.rows.map(r => '<li><span class="nm"><i class="sw" style="background:' + (lpp.rows.indexOf(r) < 6 ? r.c : '#8f8878') + '"></i>' + esc(r.k) + '<select data-kindtk="' + esc(r.k) + '" aria-label="Tipo de ' + esc(r.k) + '"><option' + (r.kind === 'ETF' ? ' selected' : '') + '>ETF</option><option value="Acción"' + (r.kind === 'Acción' ? ' selected' : '') + '>Acción</option></select></span><span class="mono">' + usd(r.v) + '</span><span class="pc">' + (r.v / lpp.total * 100).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%</span></li>').join('') + '</ul></section>' +
+      '<section class="card"><div class="card-head"><h2>ETF y acciones</h2></div><div class="split" role="img" aria-label="Proporción de ETF y acciones">' + ks.map(k => '<i style="width:' + (byKind[k] / lpp.total * 100) + '%;background:' + KIND_COL[k] + '"></i>').join('') + '</div>' +
+      '<ul class="comp">' + ks.map(k => '<li><span class="nm"><i class="sw" style="background:' + KIND_COL[k] + '"></i>' + (k === 'ETF' ? 'ETF (fondos indexados)' : 'Acciones') + '</span><span class="mono">' + usd(byKind[k]) + '</span><span class="pc">' + (byKind[k] / lpp.total * 100).toLocaleString('es-CO', { maximumFractionDigits: 1 }) + '%</span></li>').join('') + '</ul>' +
+      '<p class="note">Cambia el tipo (ETF o Acción) en la lista de posiciones si alguna quedó mal clasificada.</p></section>';
+  }
+  const intro = empty ? '<section class="empty"><h2>Tus inversiones</h2><p>Aquí llevas el saldo de tus cuentas de alto rendimiento y tu portafolio de acciones y ETF, con la TRM de cada registro. Puedes importar tu hoja de Excel desde Ajustes, o anotar tu primer registro abajo.</p></section>' : '';
+  return '<div class="invview">' + intro + hero + '<div class="grid">' + savCard + pfCard + compCard + '</div></div>';
+}
+
+$('#app').addEventListener('submit', e => {
+  const f = e.target.closest && e.target.closest('.inv-form'); if (!f) return;
+  e.preventDefault();
+  const fd = new FormData(f), d = String(fd.get('d') || '');
+  if (f.dataset.k === 'sav') {
+    const a = parseAmt(fd.get('a')), acc = capName(String(fd.get('acc') || ''));
+    if (!acc || !(a > 0) || !d) { toast('Revisa la cuenta, la fecha y el saldo.'); return; }
+    const ids = Store.invAdd('sav', [{ d: d, acc: acc, a: Math.round(a) }]);
+    toast('Guardé el saldo de ' + acc + '.', () => Store.invRemove(ids));
+  } else {
+    const trm = parseMoney(fd.get('trm')), tk = fd.getAll('tk'), us = fd.getAll('usd'), pos = {};
+    tk.forEach((x, i) => { const name = String(x).trim(), v = parseMoney(us[i]); if (name && isFinite(v) && v > 0) pos[name] = (pos[name] || 0) + v; });
+    if (!d || !(trm > 0) || !Object.keys(pos).length) { toast('Pon la fecha, la TRM y al menos una posición con su valor en USD.'); return; }
+    const ids = Store.invAdd('snap', [{ d: d, trm: trm, pos: pos }]);
+    toast('Guardé el registro del portafolio.', () => Store.invRemove(ids));
+  }
+});
+$('#app').addEventListener('click', e => {
+  const dl = e.target.closest('[data-invdel]');
+  if (dl) { const r = Store.invRemove([dl.dataset.invdel]); toast('Borré el registro.', () => Store.invRestore(r)); return; }
+  const cu = e.target.closest('[data-invcur]');
+  if (cu) { S.invCur = cu.dataset.invcur; render(); return; }
+  const rm = e.target.closest('[data-act="rmrow"]');
+  if (rm) { const row = rm.closest('.pos-row'); if (row) row.remove(); return; }
+  const ad = e.target.closest('[data-act="invrow"]');
+  if (ad) { const box = $('#posRows'); if (box) { const div = document.createElement('div'); div.className = 'pos-row'; div.innerHTML = '<input name="tk" type="text" list="tkList" maxlength="40" placeholder="Ej. Apple"><input name="usd" type="text" inputmode="decimal" placeholder="USD"><button type="button" class="del" data-act="rmrow" aria-label="Quitar posición">✕</button>'; box.appendChild(div); div.firstChild.focus(); } }
+});
+
+/* ───── importar la hoja "Inversiones" ───── */
+function fixSeries(items) {
+  let py = null, pd = null, fixed = 0;
+  items.forEach(it => {
+    let y = it.y || py || new Date().getFullYear(), iso = realDate(y, it.m, it.day);
+    if (iso && pd && iso < pd) { for (let k = 0; k < 3 && iso && iso < pd; k++) { y++; iso = realDate(y, it.m, it.day); } fixed++; }
+    it.d = iso; if (iso) { py = y; pd = iso; }
+  });
+  return fixed;
+}
+function titleCase(x) { return String(x).trim().toLowerCase().replace(/(^|\s)([a-záéíóúñ])/g, (m, a, b) => a + b.toUpperCase()); }
+function detectInv(sheets) {
+  const sav = [], snaps = [], warn = [];
+  sheets.forEach(sh => {
+    const rows = sh.rows, cell = (r, c) => { const v = (rows[r] || [])[c]; return v == null ? '' : v; };
+    for (let ri = 0; ri < Math.min(rows.length, 120); ri++) {
+      const r = rows[ri] || [];
+      for (let ci = 0; ci < r.length; ci++) {
+        if (strip(String(cell(ri, ci))).trim() !== 'mes' || !/^dia/.test(strip(String(cell(ri, ci + 1))).trim())) continue;
+        const cols = []; let cj = ci + 2;
+        while (cj < r.length && String(cell(ri, cj)).trim() !== '' && cols.length < 6) { cols.push({ c: cj, h: strip(String(cell(ri, cj))) }); cj++; }
+        if (!cols.length) continue;
+        const items = [];
+        for (let rj = ri + 1; rj < rows.length; rj++) {
+          const mes = String(cell(rj, ci)).trim(); if (!mes) break;
+          const ym = sheetYM(mes); if (!ym.m) break;
+          items.push({ m: ym.m, y: ym.y, day: Number(String(cell(rj, ci + 1)).replace(/\D/g, '')) || 1, row: rj });
+        }
+        if (!items.length) continue;
+        const fixed = fixSeries(items);
+        const usdC = cols.find(x => /usd/.test(x.h)), trmC = cols.find(x => /trm/.test(x.h)), copC = cols.find(x => /cop/.test(x.h));
+        if (usdC && trmC) {
+          const side = []; let k = cols[cols.length - 1].c + 1;
+          for (; k < r.length; k++) { const hh = String(cell(ri, k)).trim(); if (!hh) { if (side.length) break; continue; } if (/^total/.test(strip(hh))) break; side.push({ tk: hh, c: k }); }
+          items.forEach(it => {
+            if (!it.d) return;
+            const trm = parseMoney(cell(it.row, trmC.c)), left = parseMoney(cell(it.row, usdC.c)), pos = {};
+            side.forEach(sd => { const v = parseMoney(cell(it.row, sd.c)); if (isFinite(v) && v > 0) pos[sd.tk] = v; });
+            const sumP = Object.keys(pos).reduce((a, q) => a + pos[q], 0);
+            if (!(trm > 0)) return;
+            if (!sumP && !(left > 0)) return;
+            if (sumP && left > 0 && Math.abs(sumP - left) > 0.5) warn.push('Portafolio del ' + longD(it.d) + ': el total de la izquierda (' + usd(left) + ') no coincide con la suma de las posiciones (' + usd(sumP) + '). Uso la suma.');
+            const o = { d: it.d, trm: trm, pos: pos }; if (!sumP) o.usd = left; snaps.push(o);
+          });
+          if (fixed) warn.push('Había fechas fuera de orden en la tabla de inversión; las ajusté al año que sigue.');
+        } else if (/ahorro|saldo|total|valor/.test(cols[0].h)) {
+          let t = strip(String(cell(ri - 1, ci))).trim().replace(/^ahorros?\s*(en|de)?\s*/, '');
+          const acc = t ? titleCase(t) : 'Cuenta de ahorros';
+          items.forEach(it => { const a = parseMoney(cell(it.row, cols[0].c)); if (it.d && isFinite(a) && a > 0) sav.push({ d: it.d, acc: acc, a: Math.round(a) }); });
+          if (fixed) warn.push('En la tabla de ahorros ' + (fixed === 1 ? 'una fecha estaba fuera de orden (por ejemplo "Octubre 2025" después de septiembre de 2026); la pasé' : fixed + ' fechas estaban fuera de orden; las pasé') + ' al año siguiente.');
+        }
+      }
+    }
+  });
+  return sav.length || snaps.length ? { sav: sav, snaps: snaps, warn: warn } : null;
+}
+function ivPlan(st) {
+  const iv = st.iv; if (!iv) return { sav: [], snaps: [], dup: 0, warn: [] };
+  if (!st.dup) return { sav: iv.sav, snaps: iv.snaps, dup: 0, warn: iv.warn };
+  const have = Store.inv(), hs = new Set(have.sav.map(x => x.acc + '|' + x.d + '|' + x.a)), hp = new Set(have.snaps.map(x => x.d));
+  const sav = iv.sav.filter(x => !hs.has(x.acc + '|' + x.d + '|' + x.a)), snaps = iv.snaps.filter(x => !hp.has(x.d));
+  return { sav: sav, snaps: snaps, dup: iv.sav.length - sav.length + iv.snaps.length - snaps.length, warn: iv.warn };
 }
 
 /* ───────────── eventos ───────────── */
@@ -1707,6 +2064,7 @@ $('#app').addEventListener('click', e => {
 });
 $('#app').addEventListener('change', e => {
   const t = e.target;
+  const kt = t.closest && t.closest('[data-kindtk]'); if (kt) { Store.invKind(kt.dataset.kindtk, kt.value); return; }
   if (t.id === 'impFile') { impPick(t); return; }
   if (t.closest && t.closest('#imp')) { impChange(t); return; }
   const cn = t.closest && t.closest('.cfg-name');
