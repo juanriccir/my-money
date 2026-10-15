@@ -348,6 +348,12 @@ details.paste textarea{width:100%;margin-top:10px;background:#0a0a0b;color:inher
 .pcell{white-space:normal;min-width:190px;text-align:left!important;font-size:.78rem;color:var(--ink2)}
 .donut{display:flex;justify-content:center}
 .note{color:var(--muted);font-size:.82rem;margin:10px 0 0}
+.datebtn{position:relative;width:48px;height:48px;border-radius:50%;border:1px solid var(--axis);background:#141416;display:grid;place-items:center;flex:none;cursor:pointer;color:var(--gold)}
+.datebtn input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+.datebtn.on{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.2)}
+.dchip{padding-bottom:6px}
+.dchip button{border:1px solid var(--gold-lo);background:var(--brand-soft);color:var(--ink);border-radius:999px;height:30px;padding:0 12px;font-size:.82rem;cursor:pointer}
+.dchip b{color:var(--gold-hi);font-weight:600}
 </style>
 </head>
 <body>
@@ -390,8 +396,10 @@ details.paste textarea{width:100%;margin-top:10px;background:#0a0a0b;color:inher
 <form class="composer" id="composer" autocomplete="off">
   <div class="composer-in">
     <div class="pv" id="pv" aria-live="polite">Escribe el gasto o ingreso con su monto.</div>
+    <div class="dchip" id="dchip" hidden></div>
     <div class="mrow" id="mrow" role="group" aria-label="Medio de pago"></div>
     <div class="send-row">
+      <label class="datebtn" id="dateBtn" title="Elegir la fecha"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><input id="dateIn" type="date" aria-label="Fecha del movimiento"></label>
       <input id="msg" type="text" enterkeyhint="send" aria-label="Anotar movimiento" placeholder="ej. almuerzo 25k nequi">
       <button id="send" type="submit" aria-label="Anotar" disabled>↑</button>
     </div>
@@ -558,6 +566,23 @@ function parseMsg(line, fallback) {
   else if ((m2 = t2.match(/(?<![\d.,])(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?(?![\d.,])/))) {
     const dd = mkDate(m2[3] || base.slice(0, 4), m2[2], m2[1]);
     if (dd) { date = dd; t2 = t2.replace(m2[0], ' '); }
+  }
+  else if ((m2 = t2.match(/(?<![\d.,\-])(\d{1,2})[\-.](\d{1,2})[\-.](\d{4})(?![\d])/))) {
+    const dd = mkDate(m2[3], m2[2], m2[1]);
+    if (dd) { date = dd; t2 = t2.replace(m2[0], ' '); }
+  }
+  else {
+    const MN = '(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?|sep(?:t(?:iembre)?)?|set(?:iembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)';
+    const sl = strip(t2);
+    const A = sl.match(new RegExp('(?:\\bel\\s+)?(?<![\\d.,])(\\d{1,2})\\s*(?:de\\s+)?' + MN + '\\.?(?:\\s*(?:de\\s+)?(\\d{4}))?(?![a-z0-9])'));
+    const B = !A && sl.match(new RegExp('\\b' + MN + '\\.?\\s*(?:de\\s+)?(\\d{4})(?![\\d])'));
+    const MESN = { ene: 1, feb: 2, mar: 3, abr: 4, may: 5, jun: 6, jul: 7, ago: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12 };
+    if (A || B) {
+      const mo = MESN[(A ? A[2] : B[1]).slice(0, 3)], day = A ? Number(A[1]) : 1, yr = A ? A[3] : B[2];
+      let y = yr ? Number(yr) : Number(base.slice(0, 4)), dd = mkDate(y, mo, day);
+      if (dd && !yr && dd > todayISO()) dd = mkDate(y - 1, mo, day);
+      if (dd) { date = dd; const mt = A || B; t2 = t2.slice(0, mt.index) + ' ' + t2.slice(mt.index + mt[0].length); }
+    }
   }
   const re = /(?<![\w.,])(\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)\s*(millones|millon|mil|lukas|luka|palos|palo|k|m)?(?![a-zA-Z0-9])/gi;
   const cands = []; let mm;
@@ -806,7 +831,7 @@ const Store = (function () {
 })();
 
 /* ───────────── estado y cálculos ───────────── */
-const S = { month: todayISO().slice(0, 7), tab: 'resumen', q: '', type: 'all', med: 'all', medio: null, open: [], imp: null, invCur: 'cop' };
+const S = { date: null, month: todayISO().slice(0, 7), tab: 'resumen', q: '', type: 'all', med: 'all', medio: null, open: [], imp: null, invCur: 'cop' };
 const txOf = k => Store.month(k).slice().sort((a, b) => b.d.localeCompare(a.d) || String(b.id).localeCompare(String(a.id)));
 const sum = (arr, t) => arr.reduce((s, x) => s + (x.t === t ? x.a : 0), 0);
 function catTotals(items) {
@@ -958,7 +983,7 @@ function emptyHTML() {
     '<p>Escribe abajo como en WhatsApp: <code>almuerzo 25k</code>, <code>+sueldo 3.8M</code> o <code>ayer taxi 12000</code>. Yo detecto el monto, la categoría y si es gasto o ingreso.</p>' +
     '<div class="empty-actions"><button class="btn primary" data-act="demo">Cargar datos de ejemplo</button><button class="btn" data-act="import">Pegar chat de WhatsApp</button></div></section>';
 }
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 function backupDue() {
@@ -1114,7 +1139,7 @@ function viewAjustes() {
     '<section class="card"><h2>Versión de la app</h2><p class="set-p">My Money versión <b>' + APP_VERSION + '</b>. Se actualiza sola al abrirla. Si no ves un cambio reciente, fuerza la actualización: tus datos no se borran.</p><div class="set-actions"><button class="btn" data-act="update">Buscar actualización</button></div></section>' +
     '<section class="card"><h2>Instalar en el celular</h2>' + (standalone ? '<p class="okline" style="margin:8px 0 0">✓ Ya estás usando la app instalada.</p>' :
       '<ol class="howto"><li><b>Android (Chrome):</b> menú ⋮ y luego Instalar app.</li><li><b>iPhone (Safari):</b> botón Compartir y luego Añadir a pantalla de inicio.</li></ol>' + (deferredPrompt ? '<div class="set-actions" style="margin-top:12px"><button class="btn primary" data-act="install">Instalar app</button></div>' : '')) + '</section>' +
-    '<section class="card span2"><h2>Cómo anotar en el chat</h2><ol class="howto"><li><code>almuerzo 25k nequi</code> es un gasto de $ 25.000 en Restaurantes, pagado con Nequi.</li><li><code>+sueldo 3.8M transferencia</code> es un ingreso. El signo + o palabras como sueldo, freelance o me pagaron lo marcan como ingreso.</li><li><code>ayer taxi 12000 efectivo</code> usa la fecha de ayer. También sirven hoy, anteayer o 5/10.</li><li>Montos: <code>25k</code>, <code>25 mil</code>, <code>1.5M</code>, <code>1,5 millones</code>, <code>25.000</code>. Si no escribes el medio, toca uno de los botones sobre la barra de escribir.</li><li>Para forzar categoría o medio: <code>cena 80k #ocio @tarjeta</code>. Funciona también con las que crees en Ajustes.</li></ol></section></div>';
+    '<section class="card span2"><h2>Cómo anotar en el chat</h2><ol class="howto"><li><code>almuerzo 25k nequi</code> es un gasto de $ 25.000 en Restaurantes, pagado con Nequi.</li><li><code>+sueldo 3.8M transferencia</code> es un ingreso. El signo + o palabras como sueldo, freelance o me pagaron lo marcan como ingreso.</li><li><code>ayer taxi 12000 efectivo</code> usa la fecha de ayer. También sirven hoy, anteayer, <code>5/10</code>, <code>5 abril 2026</code> o <code>abril 2026</code>. Para anotar varios de un mismo día o mes, toca el calendario junto a la barra: todo lo que anotes queda en esa fecha hasta que la quites.</li><li>Montos: <code>25k</code>, <code>25 mil</code>, <code>1.5M</code>, <code>1,5 millones</code>, <code>25.000</code>. Si no escribes el medio, toca uno de los botones sobre la barra de escribir.</li><li>Para forzar categoría o medio: <code>cena 80k #ocio @tarjeta</code>. Funciona también con las que crees en Ajustes.</li></ol></section></div>';
 }
 
 /* ───────────── importar archivos (Excel, CSV, PDF) ───────────── */
@@ -2143,8 +2168,8 @@ mrow.addEventListener('click', e => {
   S.medio = S.medio === b.dataset.m ? null : b.dataset.m; drawMrow(); refreshPv(); msg.focus();
 });
 const HINT = 'Escribe el gasto o ingreso con su monto.';
-function parsed() { const p = parseMsg(msg.value.trim(), todayISO()); if (p && !p.m && S.medio) p.m = S.medio; return p; }
-function relDate(iso) { const t = todayISO(); return iso === t ? 'hoy' : iso === addDaysISO(t, -1) ? 'ayer' : dayLabel(iso).toLowerCase(); }
+function parsed() { const p = parseMsg(msg.value.trim(), S.date || todayISO()); if (p && !p.m && S.medio) p.m = S.medio; return p; }
+function relDate(iso) { const t = todayISO(); return iso === t ? 'hoy' : iso === addDaysISO(t, -1) ? 'ayer' : iso.slice(0, 4) !== t.slice(0, 4) ? longD(iso) : dayLabel(iso).toLowerCase(); }
 function refreshPv() {
   const v = msg.value.trim();
   if (!v) { pv.textContent = HINT; send.disabled = true; return; }
@@ -2154,6 +2179,15 @@ function refreshPv() {
   pv.innerHTML = '<span class="chip ' + p.t + '">' + (p.t === 'in' ? 'Ingreso' : 'Gasto') + '</span><span class="chip">' + esc(p.c) + '</span>' + (p.m ? '<span class="chip">' + esc(p.m) + '</span>' : '') + '<b>' + money(p.a) + '</b><span>' + esc(p.n) + ' · ' + esc(relDate(p.d)) + (p.m ? '' : ' · sin medio de pago') + '</span>';
 }
 msg.addEventListener('input', refreshPv);
+const dateIn = $('#dateIn'), dchip = $('#dchip');
+function drawDate() {
+  const on = !!S.date;
+  $('#dateBtn').classList.toggle('on', on); dchip.hidden = !on;
+  dchip.innerHTML = on ? '<button type="button" id="dchipX">Anotando en <b>' + esc(longD(S.date)) + '</b> · quitar ✕</button>' : '';
+  dateIn.value = S.date || '';
+}
+dateIn.addEventListener('change', () => { S.date = /^\d{4}-\d{2}-\d{2}$/.test(dateIn.value) ? dateIn.value : null; drawDate(); refreshPv(); msg.focus(); });
+dchip.addEventListener('click', e => { if (e.target.closest('#dchipX')) { S.date = null; drawDate(); refreshPv(); } });
 $('#composer').addEventListener('submit', e => {
   e.preventDefault();
   const p = parsed();

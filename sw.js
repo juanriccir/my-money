@@ -1,5 +1,5 @@
 /* My Money · service worker. Subir VERSION en cada actualización. */
-const VERSION = 'my-money-v5';
+const VERSION = 'my-money-v6';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', e => {
